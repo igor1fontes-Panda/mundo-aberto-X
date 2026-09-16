@@ -1,0 +1,21 @@
+Criei o documento: **[README-Mundo-Aberto.md](README-Mundo-Aberto.md)** — pronto para descarregar.
+
+## O que contém (10 secções, em linguagem simples)
+
+1. **Em poucas palavras** — o que é o mundo, sem jargão
+2. **O que os habitantes fazem sozinhos** — a tabela de prioridades que rege cada decisão
+3. **O que você pode fazer no painel** — todas as ações ao seu alcance
+4. **Como pôr a funcionar** — 3 passos, com o exemplo real do arranque
+5. **Como colocar online sem pagar** — Render, passo a passo, com o aviso sobre discos temporários
+6. **A base open-source** — o AI Town (MIT) e o paper *Generative Agents*, com links
+7. **Privacidade e segurança** — porque só você entra
+8. **Foi testado, não presumido** — os dois defeitos encontrados e corrigidos, e os números do teste real
+9. **Próximos passos** — site público, auditoria SEO, LLM local
+10. **Glossário** — traduz termos técnicos (servidor, alojar, HTTPS, persistente…)
+
+Escrevi-o a pensar em alguém que não é programador: frases curtas, tabelas em vez de parágrafos densos, e um glossário no fim. A nota sobre o que **não** foi feito (não publiquei o mundo online) está explícita, na secção 5.
+
+Duas notas:
+
+- O projeto continua a ter o seu **`README.md` técnico** (arquitetura, API, configuração). Este novo ficheiro é o resumo acessível, complementar.
+- O ficheiro está **fora** do `mundo-aberto.zip`. Se preferir um único download, digo-me e volto a gerar o pacote já com ele incluído — ou converto-o em **PDF/Word**, caso queira abrir num telemóvel ou partilhar com quem não usa editor de texto.
