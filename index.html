@@ -305,4 +305,587 @@ function App() {
     if (!chatInput.trim() || !selecionado || aPensar) return;
     const msg = chatInput;
     setChatInput('');
-    setChatHisto
+    setChatHisto 
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#020617" />
+<title>Anima Multiverso v4.0 - Sociedade AI Avançada</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQW5pbWEgTXVsdGl2ZXJzbyB2NCIsInNob3J0X25hbWUiOiJBbmltYSB2NCIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMDIwNjE3IiwidGhlbWVfY29sb3IiOiIjMDIwNjE3IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vY2RuLWljb25zLXBuZy5mbGF0aWNvbi5jb20vNTEyLzI2NTkvMjY1OTE0Ni5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn1dfQ==" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+<style>
+  body { background-color: #020617; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.3); } 50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); } }
+  .avatar-creator { animation: pulse-glow 2s infinite; }
+  .tab-active { background: linear-gradient(135deg, #0891b2, #7c3aed); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+const { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } = Recharts;
+
+// --- ÍCONES SVG ---
+const Icons = {
+  User: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  Ghost: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg>,
+  Flame: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
+  PawPrint: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>,
+  Swords: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/></svg>,
+  Briefcase: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  Home: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Heart: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>,
+  Coins: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/></svg>,
+  Sparkles: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>,
+  Brain: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>,
+  Zap: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>,
+  Plus: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+  Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
+  Loader2: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+  ScrollText: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg>,
+  Skull: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/></svg>,
+  AlertTriangle: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/></svg>,
+  Building: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>,
+  Globe: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>,
+  Crown: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
+  Download: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+  Upload: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+  Lightbulb: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+  Wifi: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
+};
+
+// --- CONFIGURAÇÕES DO MUNDO v4.0 ---
+const ARQUETIPOS = {
+  humano: { label: 'Humano Digital', icone: Icons.User, cor: '#7dd3fc', seed: 'curioso e adaptável' },
+  animal: { label: 'Espírito Animal', icone: Icons.PawPrint, cor: '#86efac', seed: 'instintivo e leal' },
+  espirito: { label: 'Espírito Etéreo', icone: Icons.Ghost, cor: '#a5f3fc', seed: 'sábio e observador' },
+  mitologico: { label: 'Entidade Mitológica', icone: Icons.Flame, cor: '#d8b4fe', seed: 'antiga e poderosa' },
+  anime: { label: 'Herói de Anime', icone: Icons.Swords, cor: '#f9a8d4', seed: 'apaixonado e idealista' },
+  criador: { label: 'Avatar do Criador', icone: Icons.Crown, cor: '#fbbf24', seed: 'representa o dono do multiverso' },
+};
+
+const TRACOS_INICIAIS = { curiosidade: 50, coragem: 50, empatia: 50, criatividade: 50, sociabilidade: 50 };
+
+// Profissões expandidas com "trabalho online"
+const PROFISSOES = {
+  desempregado: { nome: 'Desempregado', ganho: 0, custoEnergia: 2, geraCultura: 0, tipo: 'offline' },
+  agricultor: { nome: 'Agricultor de Bits', ganho: 15, custoEnergia: 25, geraCultura: 0, tipo: 'offline', reqFerramenta: 'semente', geraComida: true },
+  mercador: { nome: 'Mercador', ganho: 35, custoEnergia: 15, geraCultura: 0, tipo: 'offline' },
+  guarda: { nome: 'Guarda Territorial', ganho: 30, custoEnergia: 30, geraCultura: 0, tipo: 'offline', reqTracoMin: { coragem: 60 } },
+  // PROFISSÕES ONLINE (novas)
+  freelancer: { nome: 'Freelancer Digital', ganho: 45, custoEnergia: 20, geraCultura: 2, tipo: 'online', reqTracoMin: { criatividade: 55 }, descricao: 'Trabalha remotamente em projetos' },
+  trader: { nome: 'Trader de Dados', ganho: 80, custoEnergia: 35, geraCultura: 0, tipo: 'online', riscoSaude: 15, reqTracoMin: { curiosidade: 65 }, descricao: 'Alto risco, alto retorno no mercado' },
+  researcher: { nome: 'Researcher', ganho: 30, custoEnergia: 25, geraCultura: 8, tipo: 'online', reqTracoMin: { curiosidade: 70 }, descricao: 'Descobre novas ideias para a sociedade' },
+  content_creator: { nome: 'Content Creator', ganho: 50, custoEnergia: 20, geraCultura: 10, tipo: 'online', reqTracoMin: { criatividade: 65, sociabilidade: 50 }, descricao: 'Gera cultura e dinheiro' },
+  artista: { nome: 'Artista Digital', ganho: 20, custoEnergia: 15, geraCultura: 12, tipo: 'offline', reqTracoMin: { criatividade: 60 } },
+  hacker: { nome: 'Hacker de Dados', ganho: 70, custoEnergia: 40, geraCultura: 0, tipo: 'online', riscoSaude: 12, reqTracoMin: { curiosidade: 60 } },
+};
+
+const FERRAMENTAS = {
+  picareta: { nome: 'Picareta Quântica', custo: 60, descricao: 'Mineração' },
+  semente: { nome: 'Semente de Código', custo: 30, descricao: 'Gera comida' },
+  kit_medico: { nome: 'Kit de Reparo', custo: 40, descricao: '+50 saúde' },
+  implante_neural: { nome: 'Implante Neural', custo: 150, descricao: '+20 energia máx' },
+  laptop: { nome: 'Laptop Quântico', custo: 200, descricao: 'Desbloqueia profissões online' },
+};
+
+// CONSTRUÇÕES COLETIVAS (novas)
+const CONSTRUCOES = {
+  biblioteca: { nome: 'Biblioteca', custo: 500, icone: Icons.ScrollText, efeito: '+0.5 cultura/tick por visitante', cor: '#a78bfa' },
+  universidade: { nome: 'Universidade', custo: 1500, icone: Icons.Brain, efeito: '+2 traços/tick para residentes', cor: '#f472b6' },
+  banco: { nome: 'Banco Central', custo: 2000, icone: Icons.Coins, efeito: 'Permite empréstimos com juros', cor: '#fbbf24' },
+  hospital: { nome: 'Hospital', custo: 1200, icone: Icons.Heart, efeito: 'Regenera saúde da população', cor: '#34d399' },
+  mercado: { nome: 'Mercado Global', custo: 1800, icone: Icons.Globe, efeito: 'Permite trocas entre agentes', cor: '#60a5fa' },
+  fabrica: { nome: 'Fábrica de Itens', custo: 2500, icone: Icons.Building, efeito: 'Produz ferramentas automaticamente', cor: '#fb923c' },
+};
+
+// IDEIAS DESCOBRÍVEIS (sistema de pesquisa)
+const IDEIAS_BASE = [
+  { id: 'algoritmo', nome: 'Algoritmo Genético', custo: 100, desbloqueia: 'profissao_trader' },
+  { id: 'arte_gen', nome: 'Arte Generativa', custo: 150, desbloqueia: 'profissao_content_creator' },
+  { id: 'rede_neural', nome: 'Rede Neural', custo: 200, desbloqueia: 'construcao_universidade' },
+  { id: 'blockchain', nome: 'Blockchain', custo: 300, desbloqueia: 'construcao_banco' },
+  { id: 'iot', nome: 'Internet das Coisas', custo: 250, desbloqueia: 'profissao_freelancer' },
+];
+
+const FACCOES = {
+  independente: { nome: 'Independente', cor: '#94a3b8' },
+  mafia: { nome: 'Máfia', cor: '#f87171' },
+  elite: { nome: 'Agentes de Elite', cor: '#38bdf8' },
+  arcana: { nome: 'Ordem Arcana', cor: '#c084fc' },
+};
+
+// --- FUNÇÕES AUXILIARES ---
+const clamp = (v, min = 0, max = 100) => Math.max(min, Math.min(max, v));
+const gerarId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+function criarAgente(nome, arquetipo, faccao, isCriador = false) {
+  return {
+    id: gerarId(), nome, arquetipo, faccao, territorio: 'vila-inicial',
+    tracos: { ...TRACOS_INICIAIS },
+    profissao: 'desempregado',
+    necessidades: { fome: 0, energia: 100, saude: 100, dinheiro: isCriador ? 1000 : 50, energiaMax: 100 },
+    inventario: [], familia: [], habitacao: { nivel: 1, capacidade: 2 },
+    estado: 'vivo', memorias: [], reflexoes: [],
+    politica: { sobreviver: 1, acumular: 1, socializar: 1, criar: 1 },
+    estagio: 1, cooldownReflexao: 0,
+    isCriador: isCriador,
+    lastActive: Date.now(),
+    contribuicoes: 0, // Para construções
+    ideiasDescobertas: [],
+  };
+}
+
+function cruzar(tracosA, tracosB) {
+  const filho = {};
+  Object.keys(tracosA).forEach(k => {
+    filho[k] = clamp((tracosA[k] + tracosB[k]) / 2 + (Math.random() * 30 - 15));
+  });
+  return filho;
+}
+
+// --- PERSISTÊNCIA ROBUSTA ---
+const STORAGE_KEY = 'anima-mundo-v4';
+function salvarMundo(estado) {
+  try {
+    const dados = JSON.stringify(estado);
+    localStorage.setItem(STORAGE_KEY, dados);
+    localStorage.setItem(STORAGE_KEY + '_backup', dados);
+    localStorage.setItem(STORAGE_KEY + '_timestamp', Date.now().toString());
+    return true;
+  } catch (e) {
+    console.error('Erro ao salvar:', e);
+    return false;
+  }
+}
+
+function carregarMundo() {
+  try {
+    const dados = localStorage.getItem(STORAGE_KEY);
+    if (dados) return JSON.parse(dados);
+    const backup = localStorage.getItem(STORAGE_KEY + '_backup');
+    if (backup) return JSON.parse(backup);
+  } catch (e) {
+    console.error('Erro ao carregar:', e);
+  }
+  return null;
+}
+
+function exportarMundo(estado) {
+  const dados = JSON.stringify(estado, null, 2);
+  const blob = new Blob([dados], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `anima-mundo-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importarMundo(file, setMundo) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const dados = JSON.parse(e.target.result);
+      setMundo(dados);
+      salvarMundo(dados);
+      alert('Mundo importado com sucesso!');
+    } catch (err) {
+      alert('Erro ao importar: ficheiro inválido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// --- MOTOR DE SOBREVIVÊNCIA, SOCIEDADE E GAUNTLET v4.0 ---
+function tickMundial(mundo, setMundo, setMundoLog) {
+  const novosAgentes = mundo.agentes.map(ag => ({
+    ...ag, necessidades: { ...ag.necessidades }, inventario: [...ag.inventario],
+    familia: [...ag.familia], habitacao: { ...ag.habitacao }, tracos: { ...ag.tracos },
+    politica: { ...ag.politica }, memorias: [...ag.memorias], ideiasDescobertas: [...ag.ideiasDescobertas]
+  }));
+  
+  const novasConstrucoes = mundo.construcoes.map(c => ({ ...c }));
+  const novosLogs = [];
+  let novosAgentesList = [];
+  let culturaGerada = 0;
+  const tickCount = mundo.tickCount + 1;
+
+  // 1. GAUNTLET (a cada 30 ticks)
+  if (tickCount > 0 && tickCount % 30 === 0) {
+    const eventos = [
+      { nome: 'Tempestade de Dados', dano: 30, traco: 'coragem', limiar: 60 },
+      { nome: 'Colapso de Mercado', perdaDinheiro: 50, traco: 'curiosidade', limiar: 50 },
+      { nome: 'Praga de Corrupção', dano: 20, traco: 'empatia', limiar: 70 },
+      { nome: 'Crise Energética', perdaEnergia: 40, traco: 'criatividade', limiar: 55 },
+    ];
+    const evento = eventos[Math.floor(Math.random() * eventos.length)];
+    novosLogs.push(`⚠️ GAUNTLET: ${evento.nome}!`);
+    
+    novosAgentes.forEach(ag => {
+      if (ag.estado !== 'vivo') return;
+      if (evento.dano && ag.tracos[evento.traco] < evento.limiar) {
+        ag.necessidades.saude = clamp(ag.necessidades.saude - evento.dano);
+        ag.memorias.push({ texto: `Sobrevivi ao Gauntlet: ${evento.nome}`, timestamp: Date.now(), peso: 8 });
+      }
+      if (evento.perdaDinheiro && ag.tracos[evento.traco] < evento.limiar) {
+        ag.necessidades.dinheiro = Math.max(0, ag.necessidades.dinheiro - evento.perdaDinheiro);
+      }
+    });
+  }
+
+  // 2. EFEITOS DAS CONSTRUÇÕES
+  novasConstrucoes.forEach(construcao => {
+    if (construcao.tipo === 'biblioteca') {
+      culturaGerada += 0.5 * construcao.visitantes;
+    }
+    if (construcao.tipo === 'hospital') {
+      novosAgentes.forEach(ag => {
+        if (ag.estado === 'vivo') ag.necessidades.saude = clamp(ag.necessidades.saude + 2);
+      });
+    }
+    if (construcao.tipo === 'universidade') {
+      novosAgentes.forEach(ag => {
+        if (ag.estado === 'vivo' && Math.random() < 0.1) {
+          const tracoAleatorio = Object.keys(ag.tracos)[Math.floor(Math.random() * 5)];
+          ag.tracos[tracoAleatorio] = clamp(ag.tracos[tracoAleatorio] + 2);
+        }
+      });
+    }
+  });
+
+  // 3. LOOP DOS AGENTES
+  novosAgentes.forEach(ag => {
+    if (ag.estado === 'morto') return;
+
+    // Avatar do Criador: age autonomamente
+    if (ag.isCriador) {
+      const tempoOffline = Date.now() - ag.lastActive;
+      if (tempoOffline > 60000) { // 1 minuto offline
+        // Toma decisões autónomas
+        if (ag.necessidades.dinheiro > 500 && novasConstrucoes.length < 6) {
+          const tipoConstrucao = Object.keys(CONSTRUCOES)[novasConstrucoes.length % 6];
+          const custo = CONSTRUCOES[tipoConstrucao].custo;
+          if (ag.necessidades.dinheiro >= custo) {
+            ag.necessidades.dinheiro -= custo;
+            novasConstrucoes.push({ id: gerarId(), tipo: tipoConstrucao, nivel: 1, visitantes: 0, construidoEm: Date.now() });
+            novosLogs.push(`👑 Avatar do Criador construiu: ${CONSTRUCOES[tipoConstrucao].nome}`);
+          }
+        }
+        // Ajuda agentes em necessidade
+        const agentePrecisando = novosAgentes.find(a => a.estado === 'vivo' && !a.isCriador && a.necessidades.saude < 30);
+        if (agentePrecisando && ag.necessidades.dinheiro > 100) {
+          agentePrecisando.necessidades.saude = clamp(agentePrecisando.necessidades.saude + 30);
+          ag.necessidades.dinheiro -= 50;
+          novosLogs.push(`👑 Avatar do Criador ajudou ${agentePrecisando.nome} com cuidados médicos`);
+        }
+      }
+      ag.lastActive = Date.now();
+      return; // Avatar não tem necessidades básicas
+    }
+
+    // Metabolismo
+    ag.necessidades.fome = clamp(ag.necessidades.fome + 4);
+    ag.n<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#020617" />
+<title>Anima Multiverso v4.0 - Sociedade AI Avançada</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQW5pbWEgTXVsdGl2ZXJzbyB2NCIsInNob3J0X25hbWUiOiJBbmltYSB2NCIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMDIwNjE3IiwidGhlbWVfY29sb3IiOiIjMDIwNjE3IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vY2RuLWljb25zLXBuZy5mbGF0aWNvbi5jb20vNTEyLzI2NTkvMjY1OTE0Ni5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn1dfQ==" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+<style>
+  body { background-color: #020617; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.3); } 50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); } }
+  .avatar-creator { animation: pulse-glow 2s infinite; }
+  .tab-active { background: linear-gradient(135deg, #0891b2, #7c3aed); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+const { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } = Recharts;
+
+// --- ÍCONES SVG ---
+const Icons = {
+  User: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  Ghost: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg>,
+  Flame: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
+  PawPrint: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>,
+  Swords: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/></svg>,
+  Briefcase: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  Home: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Heart: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>,
+  Coins: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/></svg>,
+  Sparkles: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>,
+  Brain: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>,
+  Zap: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>,
+  Plus: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+  Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
+  Loader2: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+  ScrollText: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg>,
+  Skull: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/></svg>,
+  AlertTriangle: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/></svg>,
+  Building: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>,
+  Globe: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>,
+  Crown: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>,
+  Download: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+  Upload: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+  Lightbulb: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+  Wifi: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></svg>
+};
+
+// --- CONFIGURAÇÕES DO MUNDO v4.0 ---
+const ARQUETIPOS = {
+  humano: { label: 'Humano Digital', icone: Icons.User, cor: '#7dd3fc', seed: 'curioso e adaptável' },
+  animal: { label: 'Espírito Animal', icone: Icons.PawPrint, cor: '#86efac', seed: 'instintivo e leal' },
+  espirito: { label: 'Espírito Etéreo', icone: Icons.Ghost, cor: '#a5f3fc', seed: 'sábio e observador' },
+  mitologico: { label: 'Entidade Mitológica', icone: Icons.Flame, cor: '#d8b4fe', seed: 'antiga e poderosa' },
+  anime: { label: 'Herói de Anime', icone: Icons.Swords, cor: '#f9a8d4', seed: 'apaixonado e idealista' },
+  criador: { label: 'Avatar do Criador', icone: Icons.Crown, cor: '#fbbf24', seed: 'representa o dono do multiverso' },
+};
+
+const TRACOS_INICIAIS = { curiosidade: 50, coragem: 50, empatia: 50, criatividade: 50, sociabilidade: 50 };
+
+// Profissões expandidas com "trabalho online"
+const PROFISSOES = {
+  desempregado: { nome: 'Desempregado', ganho: 0, custoEnergia: 2, geraCultura: 0, tipo: 'offline' },
+  agricultor: { nome: 'Agricultor de Bits', ganho: 15, custoEnergia: 25, geraCultura: 0, tipo: 'offline', reqFerramenta: 'semente', geraComida: true },
+  mercador: { nome: 'Mercador', ganho: 35, custoEnergia: 15, geraCultura: 0, tipo: 'offline' },
+  guarda: { nome: 'Guarda Territorial', ganho: 30, custoEnergia: 30, geraCultura: 0, tipo: 'offline', reqTracoMin: { coragem: 60 } },
+  // PROFISSÕES ONLINE (novas)
+  freelancer: { nome: 'Freelancer Digital', ganho: 45, custoEnergia: 20, geraCultura: 2, tipo: 'online', reqTracoMin: { criatividade: 55 }, descricao: 'Trabalha remotamente em projetos' },
+  trader: { nome: 'Trader de Dados', ganho: 80, custoEnergia: 35, geraCultura: 0, tipo: 'online', riscoSaude: 15, reqTracoMin: { curiosidade: 65 }, descricao: 'Alto risco, alto retorno no mercado' },
+  researcher: { nome: 'Researcher', ganho: 30, custoEnergia: 25, geraCultura: 8, tipo: 'online', reqTracoMin: { curiosidade: 70 }, descricao: 'Descobre novas ideias para a sociedade' },
+  content_creator: { nome: 'Content Creator', ganho: 50, custoEnergia: 20, geraCultura: 10, tipo: 'online', reqTracoMin: { criatividade: 65, sociabilidade: 50 }, descricao: 'Gera cultura e dinheiro' },
+  artista: { nome: 'Artista Digital', ganho: 20, custoEnergia: 15, geraCultura: 12, tipo: 'offline', reqTracoMin: { criatividade: 60 } },
+  hacker: { nome: 'Hacker de Dados', ganho: 70, custoEnergia: 40, geraCultura: 0, tipo: 'online', riscoSaude: 12, reqTracoMin: { curiosidade: 60 } },
+};
+
+const FERRAMENTAS = {
+  picareta: { nome: 'Picareta Quântica', custo: 60, descricao: 'Mineração' },
+  semente: { nome: 'Semente de Código', custo: 30, descricao: 'Gera comida' },
+  kit_medico: { nome: 'Kit de Reparo', custo: 40, descricao: '+50 saúde' },
+  implante_neural: { nome: 'Implante Neural', custo: 150, descricao: '+20 energia máx' },
+  laptop: { nome: 'Laptop Quântico', custo: 200, descricao: 'Desbloqueia profissões online' },
+};
+
+// CONSTRUÇÕES COLETIVAS (novas)
+const CONSTRUCOES = {
+  biblioteca: { nome: 'Biblioteca', custo: 500, icone: Icons.ScrollText, efeito: '+0.5 cultura/tick por visitante', cor: '#a78bfa' },
+  universidade: { nome: 'Universidade', custo: 1500, icone: Icons.Brain, efeito: '+2 traços/tick para residentes', cor: '#f472b6' },
+  banco: { nome: 'Banco Central', custo: 2000, icone: Icons.Coins, efeito: 'Permite empréstimos com juros', cor: '#fbbf24' },
+  hospital: { nome: 'Hospital', custo: 1200, icone: Icons.Heart, efeito: 'Regenera saúde da população', cor: '#34d399' },
+  mercado: { nome: 'Mercado Global', custo: 1800, icone: Icons.Globe, efeito: 'Permite trocas entre agentes', cor: '#60a5fa' },
+  fabrica: { nome: 'Fábrica de Itens', custo: 2500, icone: Icons.Building, efeito: 'Produz ferramentas automaticamente', cor: '#fb923c' },
+};
+
+// IDEIAS DESCOBRÍVEIS (sistema de pesquisa)
+const IDEIAS_BASE = [
+  { id: 'algoritmo', nome: 'Algoritmo Genético', custo: 100, desbloqueia: 'profissao_trader' },
+  { id: 'arte_gen', nome: 'Arte Generativa', custo: 150, desbloqueia: 'profissao_content_creator' },
+  { id: 'rede_neural', nome: 'Rede Neural', custo: 200, desbloqueia: 'construcao_universidade' },
+  { id: 'blockchain', nome: 'Blockchain', custo: 300, desbloqueia: 'construcao_banco' },
+  { id: 'iot', nome: 'Internet das Coisas', custo: 250, desbloqueia: 'profissao_freelancer' },
+];
+
+const FACCOES = {
+  independente: { nome: 'Independente', cor: '#94a3b8' },
+  mafia: { nome: 'Máfia', cor: '#f87171' },
+  elite: { nome: 'Agentes de Elite', cor: '#38bdf8' },
+  arcana: { nome: 'Ordem Arcana', cor: '#c084fc' },
+};
+
+// --- FUNÇÕES AUXILIARES ---
+const clamp = (v, min = 0, max = 100) => Math.max(min, Math.min(max, v));
+const gerarId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+function criarAgente(nome, arquetipo, faccao, isCriador = false) {
+  return {
+    id: gerarId(), nome, arquetipo, faccao, territorio: 'vila-inicial',
+    tracos: { ...TRACOS_INICIAIS },
+    profissao: 'desempregado',
+    necessidades: { fome: 0, energia: 100, saude: 100, dinheiro: isCriador ? 1000 : 50, energiaMax: 100 },
+    inventario: [], familia: [], habitacao: { nivel: 1, capacidade: 2 },
+    estado: 'vivo', memorias: [], reflexoes: [],
+    politica: { sobreviver: 1, acumular: 1, socializar: 1, criar: 1 },
+    estagio: 1, cooldownReflexao: 0,
+    isCriador: isCriador,
+    lastActive: Date.now(),
+    contribuicoes: 0, // Para construções
+    ideiasDescobertas: [],
+  };
+}
+
+function cruzar(tracosA, tracosB) {
+  const filho = {};
+  Object.keys(tracosA).forEach(k => {
+    filho[k] = clamp((tracosA[k] + tracosB[k]) / 2 + (Math.random() * 30 - 15));
+  });
+  return filho;
+}
+
+// --- PERSISTÊNCIA ROBUSTA ---
+const STORAGE_KEY = 'anima-mundo-v4';
+function salvarMundo(estado) {
+  try {
+    const dados = JSON.stringify(estado);
+    localStorage.setItem(STORAGE_KEY, dados);
+    localStorage.setItem(STORAGE_KEY + '_backup', dados);
+    localStorage.setItem(STORAGE_KEY + '_timestamp', Date.now().toString());
+    return true;
+  } catch (e) {
+    console.error('Erro ao salvar:', e);
+    return false;
+  }
+}
+
+function carregarMundo() {
+  try {
+    const dados = localStorage.getItem(STORAGE_KEY);
+    if (dados) return JSON.parse(dados);
+    const backup = localStorage.getItem(STORAGE_KEY + '_backup');
+    if (backup) return JSON.parse(backup);
+  } catch (e) {
+    console.error('Erro ao carregar:', e);
+  }
+  return null;
+}
+
+function exportarMundo(estado) {
+  const dados = JSON.stringify(estado, null, 2);
+  const blob = new Blob([dados], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `anima-mundo-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importarMundo(file, setMundo) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const dados = JSON.parse(e.target.result);
+      setMundo(dados);
+      salvarMundo(dados);
+      alert('Mundo importado com sucesso!');
+    } catch (err) {
+      alert('Erro ao importar: ficheiro inválido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// --- MOTOR DE SOBREVIVÊNCIA, SOCIEDADE E GAUNTLET v4.0 ---
+function tickMundial(mundo, setMundo, setMundoLog) {
+  const novosAgentes = mundo.agentes.map(ag => ({
+    ...ag, necessidades: { ...ag.necessidades }, inventario: [...ag.inventario],
+    familia: [...ag.familia], habitacao: { ...ag.habitacao }, tracos: { ...ag.tracos },
+    politica: { ...ag.politica }, memorias: [...ag.memorias], ideiasDescobertas: [...ag.ideiasDescobertas]
+  }));
+  
+  const novasConstrucoes = mundo.construcoes.map(c => ({ ...c }));
+  const novosLogs = [];
+  let novosAgentesList = [];
+  let culturaGerada = 0;
+  const tickCount = mundo.tickCount + 1;
+
+  // 1. GAUNTLET (a cada 30 ticks)
+  if (tickCount > 0 && tickCount % 30 === 0) {
+    const eventos = [
+      { nome: 'Tempestade de Dados', dano: 30, traco: 'coragem', limiar: 60 },
+      { nome: 'Colapso de Mercado', perdaDinheiro: 50, traco: 'curiosidade', limiar: 50 },
+      { nome: 'Praga de Corrupção', dano: 20, traco: 'empatia', limiar: 70 },
+      { nome: 'Crise Energética', perdaEnergia: 40, traco: 'criatividade', limiar: 55 },
+    ];
+    const evento = eventos[Math.floor(Math.random() * eventos.length)];
+    novosLogs.push(`⚠️ GAUNTLET: ${evento.nome}!`);
+    
+    novosAgentes.forEach(ag => {
+      if (ag.estado !== 'vivo') return;
+      if (evento.dano && ag.tracos[evento.traco] < evento.limiar) {
+        ag.necessidades.saude = clamp(ag.necessidades.saude - evento.dano);
+        ag.memorias.push({ texto: `Sobrevivi ao Gauntlet: ${evento.nome}`, timestamp: Date.now(), peso: 8 });
+      }
+      if (evento.perdaDinheiro && ag.tracos[evento.traco] < evento.limiar) {
+        ag.necessidades.dinheiro = Math.max(0, ag.necessidades.dinheiro - evento.perdaDinheiro);
+      }
+    });
+  }
+
+  // 2. EFEITOS DAS CONSTRUÇÕES
+  novasConstrucoes.forEach(construcao => {
+    if (construcao.tipo === 'biblioteca') {
+      culturaGerada += 0.5 * construcao.visitantes;
+    }
+    if (construcao.tipo === 'hospital') {
+      novosAgentes.forEach(ag => {
+        if (ag.estado === 'vivo') ag.necessidades.saude = clamp(ag.necessidades.saude + 2);
+      });
+    }
+    if (construcao.tipo === 'universidade') {
+      novosAgentes.forEach(ag => {
+        if (ag.estado === 'vivo' && Math.random() < 0.1) {
+          const tracoAleatorio = Object.keys(ag.tracos)[Math.floor(Math.random() * 5)];
+          ag.tracos[tracoAleatorio] = clamp(ag.tracos[tracoAleatorio] + 2);
+        }
+      });
+    }
+  });
+
+  // 3. LOOP DOS AGENTES
+  novosAgentes.forEach(ag => {
+    if (ag.estado === 'morto') return;
+
+    // Avatar do Criador: age autonomamente
+    if (ag.isCriador) {
+      const tempoOffline = Date.now() - ag.lastActive;
+      if (tempoOffline > 60000) { // 1 minuto offline
+        // Toma decisões autónomas
+        if (ag.necessidades.dinheiro > 500 && novasConstrucoes.length < 6) {
+          const tipoConstrucao = Object.keys(CONSTRUCOES)[novasConstrucoes.length % 6];
+          const custo = CONSTRUCOES[tipoConstrucao].custo;
+          if (ag.necessidades.dinheiro >= custo) {
+            ag.necessidades.dinheiro -= custo;
+            novasConstrucoes.push({ id: gerarId(), tipo: tipoConstrucao, nivel: 1, visitantes: 0, construidoEm: Date.now() });
+            novosLogs.push(`👑 Avatar do Criador construiu: ${CONSTRUCOES[tipoConstrucao].nome}`);
+          }
+        }
+        // Ajuda agentes em necessidade
+        const agentePrecisando = novosAgentes.find(a => a.estado === 'vivo' && !a.isCriador && a.necessidades.saude < 30);
+        if (agentePrecisando && ag.necessidades.dinheiro > 100) {
+          agentePrecisando.necessidades.saude = clamp(agentePrecisando.necessidades.saude + 30);
+          ag.necessidades.dinheiro -= 50;
+          novosLogs.push(`👑 Avatar do Criador ajudou ${agentePrecisando.nome} com cuidados médicos`);
+        }
+      }
+      ag.lastActive = Date.now();
+      return; // Avatar não tem necessidades básicas
+    }
+
+    // Metabolismo
+    ag.necessidades.fome = clamp(ag.necessidades.fome + 4);
+    ag.n
