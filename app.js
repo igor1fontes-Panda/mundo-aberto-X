@@ -179,7 +179,8 @@ function App() {
   const moverMapa = (ev) => {
     if (!jogador || !mapaRef.current) return;
     const r = mapaRef.current.getBoundingClientRect();
-    E.jogadorMover(mundoRef.current, ev.clientX - r.left - 10, ev.clientY - r.top - 10);
+    // O mapa é uma vista escalada do mundo: converter pixéis do ecrã para coordenadas do mundo
+    E.jogadorMover(mundoRef.current, (ev.clientX - r.left) / escalaMapa, (ev.clientY - r.top) / escalaMapa);
     repintar();
   };
   const comprar = (key) => {
@@ -280,6 +281,21 @@ function App() {
   }, [m, m.tickCount]);
 
   const chatSel = selecionado ? (m.chats[selecionado.id] || []) : [];
+
+  // ----- Escala do mapa: o mundo (com chunks comprados) cabe no painel -----
+  const dim = E.dimensoesMundo(m);
+  const [escalaMapa, setEscalaMapa] = useState(1);
+  useEffect(() => {
+    const medir = () => {
+      const el = mapaRef.current;
+      if (!el) return;
+      const s = Math.min(el.clientWidth / dim.w, 340 / dim.h);
+      setEscalaMapa(s > 0 && isFinite(s) ? s : 1);
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    return () => window.removeEventListener('resize', medir);
+  }, [dim.w, dim.h]);
 
   return (
     <div className="min-h-screen text-slate-200" style={{ background: `radial-gradient(1200px 600px at 70% -10%, #0b2b3a55, transparent), ${CORES.bg}` }}>
@@ -390,6 +406,8 @@ function App() {
               <div ref={mapaRef} onClick={moverMapa}
                 className="relative rounded-2xl border border-slate-800 overflow-hidden cursor-crosshair select-none"
                 style={{ height: 340, background: 'linear-gradient(180deg,#0f172a,#020617)', touchAction: 'none' }}>
+                {/* Vista escalada: todo o mundo (incl. chunks comprados) visível e clicável */}
+                <div style={{ width: dim.w, height: dim.h, transform: `scale(${escalaMapa})`, transformOrigin: 'top left', position: 'absolute' }}>
                 {(m.chunks || []).map(chunk => (
                   <div key={chunk.id}>
                     {(chunk.ruas || []).map((r, i) => (
@@ -438,6 +456,7 @@ function App() {
                     </button>
                   );
                 })}
+                </div>{/* fim da vista escalada */}
                 {!jogador && (
                   <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none">
                     <span className="text-[10px] px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700 text-slate-400">

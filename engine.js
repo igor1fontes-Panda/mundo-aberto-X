@@ -377,8 +377,9 @@
   }
   function criarAnimal(mundo, especie) {
     const def = mundo.cfg.fauna.especies[especie] || pick(Object.values(mundo.cfg.fauna.especies));
+    const d = dimensoesMundo(mundo);
     return { id: gerarId(), especie, nome: def.nome, emoji: def.emoji, cor: def.cor, velocidade: def.velocidade,
-      x: 20 + Math.random() * (mundo.cfg.mapa.largura - 40), y: 20 + Math.random() * (mundo.cfg.mapa.altura - 40),
+      x: 20 + Math.random() * (d.w - 40), y: 20 + Math.random() * (d.h - 40),
       estado: 'vivo', ferido: false, energia: 80 };
   }
   function tickFauna(mundo) {
@@ -393,9 +394,10 @@
       novo.y = clamp(pai.y + 10, 10, mundo.cfg.mapa.altura - 10);
       mundo.fauna.push(novo);
     }
+    const d = dimensoesMundo(mundo);
     mundo.fauna.forEach(an => {
-      an.x = clamp(an.x + (Math.random() * 2 - 1) * an.velocidade * 2, 5, mundo.cfg.mapa.largura - 5);
-      an.y = clamp(an.y + (Math.random() * 2 - 1) * an.velocidade * 2, 5, mundo.cfg.mapa.altura - 5);
+      an.x = clamp(an.x + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.w - 5);
+      an.y = clamp(an.y + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.h - 5);
       // Ferimentos acontecem; cuidadores e o hospital curam (Protocolo da Fauna)
       if (!an.ferido && Math.random() < 0.01) { an.ferido = true; logMundo(mundo, `🐾 ${an.nome} ficou ferido na natureza.`); }
       if (an.ferido && temConstrucao(mundo, 'hospital') && Math.random() < 0.3) { an.ferido = false; logMundo(mundo, `💗 O hospital curou ${an.nome}.`); }
@@ -930,11 +932,21 @@
     return pesquisarIdea(mundo, j.id, ideaId);
   }
 
+  // Dimensões atuais do mundo: os chunks comprados estendem a grelha
+  // (idx ímpar → coluna direita, idx par → linha abaixo)
+  function dimensoesMundo(mundo) {
+    const mapa = mundo.cfg.mapa || {};
+    const largura = mapa.largura || 640, altura = mapa.altura || 320;
+    const n = mundo.chunksComprados || 0;
+    const colunas = 1 + (n >= 1 ? 1 : 0);
+    const linhas = 1 + Math.floor(n / 2);
+    return { w: largura * colunas, h: altura * linhas };
+  }
+
   function jogadorMover(mundo, x, y) {
     const j = mundo.jogador; if (!j) return;
-    const largura = (mundo.cfg.mapa && mundo.cfg.mapa.largura) || 640;
-    const altura = (mundo.cfg.mapa && mundo.cfg.mapa.altura) || 320;
-    j.x = clamp(x, 5, largura - 5); j.y = clamp(y, 5, altura - 5);
+    const d = dimensoesMundo(mundo);
+    j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5);
   }
 
   function jogadorExpandirMapa(mundo) {
@@ -1021,7 +1033,7 @@
     enviarChat, mudarIdioma, falarAgente,
     jogadorComprar, jogadorOfertar, jogadorDarFerramenta, jogadorConstruir, jogadorPesquisar, jogadorMover,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,
-    jogadorDefinirCarreira,
+    jogadorDefinirCarreira, dimensoesMundo,
     estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, custoProximoChunk, temConstrucao,
     serializar, deserializar, logMundo, clamp, pick, gerarId,
   };
