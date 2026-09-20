@@ -11,11 +11,11 @@
 <title>Mundo Aberto X — Sociedade de Agentes AI</title>
 <meta name="description" content="Multiverso de agentes AI autónomos: língua emergente Lume, LumeBrain (nano-LLM gestor), Gauntlet de Fibonacci e um jogador dentro do mundo." />
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTXVuZG8gQWJlcnRvIFgiLCJzaG9ydF9uYW1lIjoiTVVOLVgiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzAyMDYxNyIsInRoZW1lX2NvbG9yIjoiIzAyMDYxNyIsImljb25zIjpbeyJzcmMiOiJodHRwczovL2Nkbi1pY29ucy1wbmcuZmxhdGljb24uY29tLzUxMi8yNjU5LzI2NTkxNDYucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XX0=" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
-<script src="mundo.json"></script>
-<script src="engine.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/recharts@2.15.4/umd/Recharts.js" crossorigin="anonymous"></script>
+<script defer src="mundo.js"></script>
+<script defer src="engine.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; overscroll-behavior: none; }
@@ -23,6 +23,7 @@
   button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
   input { font-family: inherit; font-size: 16px; }
   #root:empty::after { content: 'A carregar o multiverso…'; display: flex; align-items: center; justify-content: center; height: 100vh; color: #475569; font-size: 14px; letter-spacing: .1em; }
+  #boot-erro { display: none; padding: 2rem; text-align: center; color: #f87171; font-family: ui-monospace, monospace; white-space: pre-wrap; }
   ::selection { background: #0e7490; color: #fff; }
   .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
@@ -71,7 +72,17 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="app.js"></script>
+<div id="boot-erro"></div>
+<script>
+  window.addEventListener('error', function (e) {
+    var el = document.getElementById('boot-erro');
+    if (el && document.getElementById('root').childElementCount === 0) {
+      el.style.display = 'block';
+      el.textContent = '⚠️ Erro ao arrancar: ' + (e.message || 'desconhecido');
+    }
+  });
+</script>
+<script defer src="app.compiled.js"></script>
 <script>
   // Vercel Speed Insights - initializes the queue for tracking
   window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
