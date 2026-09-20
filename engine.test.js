@@ -282,5 +282,49 @@ teste('v6.1: Gauntlet não atinge o Criador', () => {
   expect(j.necessidades.saude === 100, 'saúde do Criador intacta');
 });
 
+teste('v6.1: dimensões do mundo crescem com chunks comprados', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  expect(E.dimensoesMundo(m).w === 640 && E.dimensoesMundo(m).h === 320, 'base 640×320');
+  E.expandirMapa(m, m.jogador.id); // idx 1 → coluna direita
+  expect(E.dimensoesMundo(m).w === 1280 && E.dimensoesMundo(m).h === 320, 'chunk 1 dobra a largura');
+  E.expandirMapa(m, m.jogador.id); // idx 2 → linha abaixo
+  expect(E.dimensoesMundo(m).w === 1280 && E.dimensoesMundo(m).h === 640, 'chunk 2 dobra a altura');
+});
+
+teste('v6.1: Criador pode andar no território comprado', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  E.expandirMapa(m, m.jogador.id);
+  E.jogadorMover(m, 1000, 160); // x > 640: só possível no novo chunk
+  expect(m.jogador.x === 1000, 'posição além do mapa base aceite');
+});
+
+teste('v6.1: graduado recebe colocação imediata', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.construcoes.push({ id: E.gerarId(), tipo: 'escola', nivel: 1, visitantes: 0, construidoEm: Date.now(), criadoPor: 'teste' });
+  const al = m.agentes.find(a => !a.isCriador);
+  al.profissao = 'estudante';
+  Object.keys(CFG.skills.catalogo).forEach(s => { al.skills[s] = 1; }); // sabe tudo
+  const r = E.estudar(m, al);
+  expect(al.profissao !== 'estudante', 'saiu de estudante após graduar (' + al.profissao + ')');
+  expect(typeof r.acao === 'string', 'ação registada: ' + r.acao);
+});
+
+teste('v6.1: bolsa de estudo sai do fundo comum', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.construcoes.push({ id: E.gerarId(), tipo: 'escola', nivel: 1, visitantes: 0, construidoEm: Date.now(), criadoPor: 'teste' });
+  const al = m.agentes.find(a => !a.isCriador);
+  al.profissao = 'estudante';
+  al.necessidades.dinheiro = 0;
+  const fundoAntes = 500;
+  m.fundoComum = fundoAntes;
+  E.estudar(m, al);
+  expect(m.fundoComum === fundoAntes - CFG.skills.bolsaAula, 'fundo pagou a bolsa');
+  expect(al.necessidades.dinheiro === CFG.skills.bolsaAula, 'estudante recebeu a bolsa');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);

@@ -4,7 +4,7 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 
 ## O que é este projeto
 
-**Mundo Aberto X** — multiverso de agentes AI autónomos, 100% frontend estático (HTML/JS puro, zero build, zero dependências de runtime). Deploy no Vercel como site estático.
+**Mundo Aberto X** — multiverso de agentes AI autónomos, frontend estático servido como ficheiros planos. O JSX é **pré-compilado** com esbuild (devDependency) em `app.compiled.js` — o browser nunca transpila. Deploy no Vercel como site estático (`vercel.json` fixa `buildCommand: null`).
 
 ## Estrutura (ficheiros que importam)
 
@@ -12,11 +12,13 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 |---|---|
 | `mundo.json` | **Fonte de verdade da configuração**: profissões, ferramentas, construções, ideias, zonas do mapa, eventos do Gauntlet, sementes da língua Lume, parâmetros do LumeBrain. Números de balance mudam AQUI, não no código. |
 | `engine.js` | Motor puro (sem React). Fibonacci, língua Lume, LumeBrain, loop de críticos, Gauntlet, jogador, serialização. Expõe `window.Engine` no browser e `module.exports` em Node. |
-| `app.js` | UI React (via Babel-standalone no browser). Mapa, jogador jogável, chat, painéis, gráficos Recharts. |
-| `index.html` | Shell. Carrega React/Recharts por CDN + `mundo.json`, `engine.js`, `app.js`. Inclui CSS utilitário mínimo (a Tailwind CDN foi removida — não a reintroduzir sem necessidade). |
-| `serve.js` | Servidor estático zero-dependências (`npm start`, `PORT` env, bind 0.0.0.0). |
+| `app.js` | UI React **fonte JSX** (não é carregado diretamente pelo browser). Mapa, jogador jogável, chat, painéis, gráficos Recharts. |
+| `app.compiled.js` | **Artefacto gerado** por `npm run build:local` a partir de `app.js` — é isto que o browser carrega. Re-gerar sempre que `app.js` mudar. |
+| `mundo.js` | **Artefacto gerado** a partir de `mundo.json` (`window.WORLD=...`) — JSON puro não é JS executável. |
+| `index.html` | Shell. Carrega React/Recharts por CDN (afixados, `defer`) + `mundo.js`, `engine.js`, `app.compiled.js`. Tem painel de erro de boot — se algo falhar, o erro aparece no ecrã em vez de loading eterno. |
+| `serve.js` | Servidor estático zero-dependências (`node serve.js`, `PORT` env, bind 0.0.0.0). |
 | `engine.test.js` | Smoke tests em Node puro (`npm test`, sem framework). |
-| `Readme-mundo-aberto` | Rascunho antigo; candidato a remover num cleanup futuro. |
+| `vercel.json` | Fixa `buildCommand: null` + `outputDirectory: "."` — a Vercel serve os artefactos commitados sem tentar construir. |
 
 ## Regras de ouro
 
@@ -33,17 +35,18 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 ## Como correr
 
 ```bash
-npm install   # instala apenas para ter npm confortável; não há dependências
-npm test      # smoke tests do engine (Node puro)
-npm start     # serve em http://localhost:3000 (usa PORT para mudar)
+npm install        # instala esbuild (devDependency) — necessário para o build
+npm test           # 28 smoke tests do engine (Node puro)
+npm run build:local # re-gera app.compiled.js + mundo.js (correr após editar app.js ou mundo.json)
+npm start          # build:local + serve em http://localhost:3000 (usa PORT para mudar)
 ```
 
-Deploy: **Vercel estático** — sem build step (`index.html` é a raiz). O `serve.js` serve como fallback local/preview.
+Deploy: **Vercel estático** — `vercel.json` desativa o build (`buildCommand: null`); os artefactos (`app.compiled.js`, `mundo.js`) vão commitados e são servidos tal e qual. O `serve.js` serve como fallback local/preview.
 
 ## Ao mudar o código
 
-- Testar sempre `npm test` após tocar no `engine.js` — os 20 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta) e v6.1 (Protocolos da Continuidade).
-- No browser, validar o console: erros de sintaxe no `app.js` deixam o `#root` vazio (existe um placeholder "A carregar o multiverso…" que permanece se o React não montar).
+- Testar sempre `npm test` após tocar no `engine.js` — os 28 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta) e v6.1 (Protocolos da Continuidade + dimensões do mundo/colocação/bolsa).
+- **JSX nunca vai direto ao browser.** Depois de editar `app.js`, correr `npm run build:local` e commitar também `app.compiled.js` (e `mundo.js` se `mundo.json` mudou). O `index.html` tem painel de erro de boot que mostra a exceção em vez do loading eterno.
 - Manter o engine livre de React/DOM — tem de continuar a correr em Node para os testes.
 - Idioma dos textos de UI: português (o mundo pertence ao Criador falante de PT). Código e identificadores: inglês.
 
