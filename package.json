@@ -5,8 +5,8 @@
   "description": "Sociedade expansível de agentes AI: escola/academia, professores auto-aprendentes, código de conduta, mapa RPG com ruas, fauna, touch, língua Lume.",
   "type": "commonjs",
   "scripts": {
-    "start": "npm run build && node serve.js",
-    "build": "esbuild app.js --loader:.js=jsx --jsx=transform --target=es2018 --outfile=app.compiled.js && node -e \"const fs=require('fs');fs.writeFileSync('mundo.js','window.WORLD='+fs.readFileSync('mundo.json','utf8')+';')\"",
+    "start": "npm run build:local && node serve.js",
+    "build:local": "esbuild app.js --loader:.js=jsx --jsx=transform --target=es2018 --outfile=app.compiled.js && node -e \"const fs=require('fs');fs.writeFileSync('mundo.js','window.WORLD='+fs.readFileSync('mundo.json','utf8')+';')\"",
     "test": "node engine.test.js"
   },
   "dependencies": {
