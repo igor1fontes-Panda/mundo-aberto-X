@@ -1,0 +1,13 @@
+# Segredos / ambiente (nunca commitar)
+.env
+.env.local
+.env.*.local
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+
+# Exportações locais do mundo
+mundo-aberto-x-*.json
