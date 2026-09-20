@@ -28,27 +28,31 @@
 ## 🚀 Correr localmente
 
 ```bash
-npm install   # sem dependências, apenas formalidade
-npm test      # 20 smoke tests do engine
-npm start     # http://localhost:3000
+npm install         # instala esbuild (compilador JSX) — única devDependency
+npm test            # 28 smoke tests do engine
+npm run build:local # re-gera app.compiled.js + mundo.js (após editar app.js ou mundo.json)
+npm start           # compila e serve em http://localhost:3000
 ```
 
 Ou abrir `index.html` diretamente no browser.
 
 ## ☁️ Deploy (Vercel)
 
-Site estático puro — apontar o Vercel para o repositório é suficiente (sem build command; `serve.js` serve como fallback local). A app já está ligada ao GitHub e publica em cada push.
+Site estático puro — `vercel.json` fixa `buildCommand: null` e serve os artefactos commitados (`app.compiled.js`, `mundo.js`) tal e qual; `serve.js` é o fallback local. A app já está ligada ao GitHub e publica em cada push.
 
 ## 🗂️ Estrutura
 
 ```
-mundo.json       ← configuração (fonte de verdade)
-engine.js        ← motor de simulação (Node + browser)
-app.js           ← UI React (via CDN)
-index.html       ← shell
-engine.test.js   ← smoke tests
-serve.js         ← servidor estático
-CLAUDE.md        ← guia para agentes AI
+mundo.json        ← configuração (fonte de verdade)
+engine.js         ← motor de simulação (Node + browser)
+app.js            ← UI React (fonte JSX)
+app.compiled.js   ← artefacto compilado (gerado — o que o browser carrega)
+mundo.js          ← artefacto gerado de mundo.json (window.WORLD)
+index.html        ← shell (React/Recharts por CDN, afixados)
+engine.test.js    ← smoke tests
+serve.js          ← servidor estático
+vercel.json       ← config do deploy (sem build)
+CLAUDE.md         ← guia para agentes AI
 ```
 
 ## 📱 Instalar como app (Android 14)
