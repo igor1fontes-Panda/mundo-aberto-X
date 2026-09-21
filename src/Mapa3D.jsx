@@ -97,6 +97,130 @@ function rectCruza(x, z, w, h, rx, rz, rw, rh, margem = 0) {
 const SKINS = ['#ffd9b3', '#f5c396', '#e8a870', '#c98a5b', '#8d5a3a', '#6b4226'];
 const HAIRS = ['#1e1b2e', '#4a2c17', '#8b4513', '#c2743f', '#e0b34d', '#f9a8d4', '#7dd3fc', '#a78bfa', '#86efac', '#e2e8f0'];
 
+/* ------------------------------------------------------------
+   TRAJES POR SETOR (polígonos médios — orçamento de performance)
+   · terra:    agricultura/comércio — tons terra e fibras naturais,
+               Lambert barato, texturas detalhadas sem exagero de normal maps
+   · formal:   economia/bancos — estética polida, bordas vincadas (caixas
+               de alfaiataria), paleta sóbria, postura ereta e elegante
+   · policial: funcional — maior densidade de polígonos nas articulações
+               (liberdade de movimento), acessórios rígidos (cinto
+               utilitário, emblemas) e reflexo diferenciado metal/couro
+   ------------------------------------------------------------ */
+const SETOR_TRAJE = {
+  agricultor: 'terra', mercador: 'terra', minerador: 'terra', cuidador: 'terra', estudante: 'terra',
+  trader: 'formal', professor: 'formal', professor_aula: 'formal', academico: 'formal',
+  researcher: 'formal', medico: 'formal', engenheiro: 'formal',
+  guarda: 'policial',
+};
+const COR_ROUPA = {
+  agricultor: '#5a7d3a', // verde-campo
+  mercador: '#8b5a2b',   // castanho de feira
+  minerador: '#7a5c3e',  // casaco de trabalho
+  cuidador: '#a89163',   // bege de fibras
+  estudante: '#8d6e63',  // túnica simples
+  trader: '#1f2a44',     // fato azul-noite
+  professor: '#2c3e50',
+  professor_aula: '#34495e',
+  academico: '#23324d',
+  researcher: '#e2e8f0', // jaleco
+  medico: '#f1f5f9',     // jaleco branco
+  engenheiro: '#37474f', // fato de obra
+  guarda: '#1e3a5f',     // uniforme policial
+};
+const matCouro = () => new THREE.MeshPhongMaterial({ color: '#3b2a1e', shininess: 38, specular: '#5a3a22' });
+const matMetal = () => new THREE.MeshPhongMaterial({ color: '#fbbf24', shininess: 110, specular: '#cccccc', emissive: '#fbbf24', emissiveIntensity: 0.25 });
+
+// Acessórios rígidos e peças de vestuário por setor (anexados ao grupo do habitante)
+function aplicarTraje(g, setor, prof) {
+  if (setor === 'terra') {
+    if (prof === 'agricultor') {
+      // chapéu de palha (fibras naturais)
+      const palha = new THREE.MeshLambertMaterial({ color: '#d9b44a' });
+      const aba = new THREE.Mesh(new THREE.CylinderGeometry(6.9, 6.9, 0.55, 12), palha);
+      aba.position.y = 22.4; g.add(aba);
+      const topo = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.8, 2.4, 12), palha);
+      topo.position.y = 23.7; g.add(topo);
+    }
+    if (prof === 'minerador') {
+      // capacete rígido de obra
+      const capacete = new THREE.Mesh(
+        new THREE.SphereGeometry(5.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshLambertMaterial({ color: '#fbbf24' })
+      );
+      capacete.position.y = 19.2; g.add(capacete);
+      const abaC = new THREE.Mesh(new THREE.CylinderGeometry(5.9, 5.9, 0.5, 12), new THREE.MeshLambertMaterial({ color: '#d97706' }));
+      abaC.position.y = 19.3; g.add(abaC);
+    }
+    // avental de fibras naturais (o sinal da terra)
+    if (prof !== 'minerador') {
+      const corAv = { agricultor: '#4a7c3f', mercador: '#6b4226', cuidador: '#d6c8a8', estudante: '#bcaaa4' }[prof] || '#8b5a2b';
+      const avental = new THREE.Mesh(new THREE.BoxGeometry(6.2, 6.6, 0.9), new THREE.MeshLambertMaterial({ color: corAv }));
+      avental.position.set(0, 7.2, 3.5); g.add(avental);
+    }
+    if (prof === 'mercador') {
+      // faixa vermelha de feira à cintura
+      const faixa = new THREE.Mesh(new THREE.TorusGeometry(4.0, 0.85, 8, 14), new THREE.MeshLambertMaterial({ color: '#c0392b' }));
+      faixa.rotation.x = Math.PI / 2; faixa.position.y = 4.9; g.add(faixa);
+    }
+  }
+  if (setor === 'formal') {
+    const jaleco = prof === 'medico' || prof === 'researcher';
+    if (!jaleco) {
+      // camisa branca + gravata — bordas vincadas de alfaiataria
+      const camisa = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.2, 0.8), new THREE.MeshLambertMaterial({ color: '#f8fafc' }));
+      camisa.position.set(0, 8.9, 3.3); g.add(camisa);
+      const gravata = new THREE.Mesh(new THREE.BoxGeometry(1.15, 4.4, 0.55), new THREE.MeshLambertMaterial({ color: prof === 'trader' ? '#7f1d1d' : '#1d4ed8' }));
+      gravata.position.set(0, 8.9, 3.85); g.add(gravata);
+    } else {
+      // gola de jaleco clínico
+      const gola = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.9, 0.8), new THREE.MeshLambertMaterial({ color: '#334155' }));
+      gola.position.set(0, 11.4, 3.1); g.add(gola);
+    }
+    // óculos de bastidor (paleta sóbria)
+    if (prof === 'trader' || prof === 'researcher' || prof === 'medico') {
+      const aro = new THREE.MeshLambertMaterial({ color: '#1e1b2e' });
+      for (const sx of [-2.1, 2.1]) {
+        const r = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.22, 6, 12), aro);
+        r.position.set(sx, 16.6, 4.7); g.add(r);
+      }
+    }
+    // maleta de couro do trader
+    if (prof === 'trader') {
+      const maleta = new THREE.Mesh(new THREE.BoxGeometry(3.8, 3.0, 1.0), matCouro());
+      maleta.position.set(5.4, 5.2, 0); g.add(maleta);
+    }
+  }
+  if (setor === 'policial') {
+    // emblema metálico no peito (reflexo de metal diferenciado)
+    const badge = new THREE.Mesh(new THREE.OctahedronGeometry(1.15), matMetal());
+    badge.scale.set(1, 1.35, 0.5); badge.position.set(2.7, 10.6, 3.5); g.add(badge);
+    // cinto utilitário de couro + fivela metálica
+    const cinto = new THREE.Mesh(new THREE.TorusGeometry(4.15, 0.85, 8, 18), matCouro());
+    cinto.rotation.x = Math.PI / 2; cinto.position.y = 4.7; g.add(cinto);
+    const fivela = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 0.7), matMetal());
+    fivela.position.set(0, 4.7, 4.35); g.add(fivela);
+    // bolsas rígidas do cinto
+    for (const sx of [-1, 1]) {
+      const bolsa = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.0, 1.2), matCouro());
+      const ang = sx * 1.1;
+      bolsa.position.set(Math.sin(ang) * 4.4, 4.7, Math.cos(ang) * 4.4);
+      bolsa.rotation.y = ang; g.add(bolsa);
+    }
+    // ombreiras rígidas
+    for (const sx of [-4.6, 4.6]) {
+      const ombreira = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 3.4), matCouro());
+      ombreira.position.set(sx, 12.0, 0); g.add(ombreira);
+    }
+    // gorra com viseira polida + emblema da patrulha      const gorra = new THREE.Mesh(new THREE.CylinderGeometry(4.55, 4.75, 2.3, 14), new THREE.MeshLambertMaterial({ color: '#1e3a5f' }));
+      gorra.position.y = 22.3; g.add(gorra);
+      const viseira = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.55, 3.2), new THREE.MeshPhongMaterial({ color: '#14203a', shininess: 60, specular: '#334455' }));
+      viseira.position.set(0, 21.25, 4.9); g.add(viseira);
+      const emblema = new THREE.Mesh(new THREE.SphereGeometry(0.85, 10, 10), matMetal());
+      emblema.scale.set(1, 1, 0.45); emblema.position.set(0, 23.6, 4.5); g.add(emblema);
+  }
+}
+
 const COR_NIGHT_SKY = new THREE.Color('#0b1026');
 const COR_DAY_SKY = new THREE.Color('#7ec8e3');
 const COR_DUSK_SKY = new THREE.Color('#c2743f');
@@ -213,6 +337,9 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const h = hashId(ag.id);
       const skin = new THREE.Color(SKINS[h % SKINS.length]);
       const hairC = new THREE.Color(HAIRS[(h >> 3) % HAIRS.length]);
+      // setor do traje e cor de roupa da profissão (paletas por setor)
+      const setor = ag.isCriador ? 'casual' : (SETOR_TRAJE[ag.profissao] || 'casual');
+      const corRoupa = setor === 'casual' ? cor : new THREE.Color(COR_ROUPA[ag.profissao] || arq.cor || '#7dd3fc');
 
       const g = new THREE.Group();
       g.userData = {
@@ -221,14 +348,16 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         tx: ag.x, tz: ag.y, // alvo vindo do engine (render interpola)
       };
 
-      const matCorpo = new THREE.MeshLambertMaterial({ color: cor, emissive: cor.clone().multiplyScalar(0.18) });
+      const matCorpo = new THREE.MeshLambertMaterial({ color: corRoupa, emissive: corRoupa.clone().multiplyScalar(0.15) });
       const matSkin = new THREE.MeshLambertMaterial({ color: skin });
       const matHair = new THREE.MeshLambertMaterial({ color: hairC, emissive: hairC.clone().multiplyScalar(0.12) });
       const matOlho = new THREE.MeshBasicMaterial({ color: 0x1e1b2e });
       const matGlint = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
       // pernas (esferas pequenas — estilo chibi)
-      const legGeo = new THREE.SphereGeometry(1.7, 8, 8);
+      // polícia: maior densidade de polígonos nas articulações (liberdade de movimento)
+      const segJ = setor === 'policial' ? 14 : 8;
+      const legGeo = new THREE.SphereGeometry(1.7, segJ, segJ);
       const legs = [];
       for (const sx of [-1.9, 1.9]) {
         const leg = new THREE.Mesh(legGeo, matCorpo);
@@ -241,7 +370,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       body.position.y = 7.4;
       g.add(body);
       // braços com pivot no ombro (para balançar ao andar)
-      const armGeo = new THREE.CapsuleGeometry(1.15, 3.2, 4, 8);
+      const armGeo = new THREE.CapsuleGeometry(1.15, 3.2, 4, segJ);
       const arms = [];
       for (const sx of [-4.4, 4.4]) {
         const pivot = new THREE.Group();
@@ -272,6 +401,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         gl.position.set(sx + 0.32, 17.0, 5.15);
         g.add(gl);
       }
+      aplicarTraje(g, setor, ag.profissao);
       // Criador: coroa dourada
       if (ag.isCriador) {
         const crown = new THREE.Mesh(
@@ -292,6 +422,9 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       g.add(nome);
 
       g.userData.anim = { legs, arms, head, body };
+      // postura por setor (rigging): banqueiro ereto e elegante · polícia largura de ombros
+      if (setor === 'formal') g.userData.anim.bodyScale = { x: 0.94, y: 1.1, z: 0.94 };
+      if (setor === 'policial') g.userData.anim.bodyScale = { x: 1.08, y: 1.0, z: 1.06 };
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
     }
@@ -799,7 +932,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         const bob = moving ? Math.abs(Math.sin(walkT)) * 0.9 : Math.sin(t * 2 + h * 0.05) * 0.3;
         g.position.y = bob + (sel ? 2 + Math.sin(t * 3) * 0.6 : 0);
         // poses idle: respiração subtil e olhar curioso quando parado
-        A.body.scale.set(1, 1 + Math.sin(t * 2.1 + h * 0.07) * 0.03, 1);
+        const BS = A.bodyScale || { x: 1, y: 1, z: 1 };
+        A.body.scale.set(BS.x, BS.y * (1 + Math.sin(t * 2.1 + h * 0.07) * 0.03), BS.z);
         A.head.rotation.y = moving ? 0 : Math.sin(t * 0.55 + h * 0.11) * 0.22;
         A.head.rotation.z = moving ? 0 : Math.sin(t * 0.4 + h * 0.05) * 0.05;
       });
