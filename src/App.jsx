@@ -265,6 +265,71 @@ export default function App() {
     repintar();
   };
 
+  // ----- Ações de jogo (pegar/gerar/atacar/defender/interagir) -----
+  const acaoPegar = useCallback(() => {
+    const r = E.jogadorPegar(mundoRef.current);
+    mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
+    repintar();
+  }, [mostrarToast, repintar]);
+  const acaoGerar = useCallback(() => {
+    const r = E.jogadorGerarItem(mundoRef.current, 'comida');
+    mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
+    repintar();
+  }, [mostrarToast, repintar]);
+  const acaoDefender = useCallback(() => {
+    const r = E.jogadorDefender(mundoRef.current);
+    mostrarToast(r.ok ? '🛡️ Defesa ativa — golpes refletidos' : r.erro, !r.ok);
+    repintar();
+  }, [mostrarToast, repintar]);
+  const acaoAtacar = useCallback(() => {
+    const m2 = mundoRef.current;
+    const alvo = m2.agentes.find(a => a.id === selecionadoId);
+    if (!alvo || alvo.isCriador) { mostrarToast('Seleciona um habitante no mapa para atacar', true); return; }
+    const r = E.jogadorAtacar(m2, alvo.id);
+    mostrarToast(r.ok ? `⚔️ Golpe em ${alvo.nome} (−${r.dano} saúde${r.defendido ? ' · defendido' : ''})` : r.erro, !r.ok);
+    repintar();
+  }, [selecionadoId, mostrarToast, repintar]);
+  const acaoInteragir = useCallback(() => {
+    const m2 = mundoRef.current;
+    const alvo = m2.agentes.find(a => a.id === selecionadoId);
+    if (!alvo || alvo.isCriador) { mostrarToast('Seleciona um habitante para interagir', true); return; }
+    const r = E.jogadorInteragirSer(m2, alvo.id, 'elogiar');
+    mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
+    repintar();
+  }, [selecionadoId, mostrarToast, repintar]);
+
+  // ----- Gamepad (Android/comandos): stick esquerdo move · A=pegar · B=atacar · X=interagir · Y=defender -----
+  useEffect(() => {
+    let rafId = 0;
+    let prevButtons = [];
+    let lastMove = 0;
+    const step = (now) => {
+      rafId = requestAnimationFrame(step);
+      try {
+        const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        const gp = pads && (pads[0] || Array.from(pads).find(pp => pp));
+        if (!gp) return;
+        const m2 = mundoRef.current;
+        const dz = v => (Math.abs(v) > 0.25 ? v : 0);
+        const vx = dz(gp.axes[0] || 0), vy = dz(gp.axes[1] || 0);
+        if (m2.jogador && (vx || vy) && now - lastMove > 90) {
+          lastMove = now;
+          E.jogadorMover(m2, m2.jogador.x + vx * 14, m2.jogador.y + vy * 14);
+          repintar();
+        }
+        const pressed = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+        const just = i => pressed(i) && !prevButtons[i];
+        if (just(0)) acaoPegar();
+        if (just(1)) acaoAtacar();
+        if (just(2)) acaoInteragir();
+        if (just(3)) acaoDefender();
+        prevButtons = gp.buttons.map(b => b.pressed);
+      } catch (e) { /* gamepad indisponível — silencioso */ }
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [acaoPegar, acaoAtacar, acaoInteragir, acaoDefender, repintar]);
+
   // ----- Derivados -----
   const vivos = m.agentes.filter(a => a.estado === 'vivo');
   const ticksParaGauntlet = FIB8 - (m.tickCount % FIB8);
@@ -426,6 +491,24 @@ export default function App() {
                         className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#052e16', color: '#bbf7d0' }}>💗 Curar</button>
                       <button onClick={() => interagirFauna('alimentar')}
                         className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#052e16', color: '#bbf7d0' }}>🍖 Alimentar</button>
+                    </>
+                  )}
+                  {jogador && (
+                    <>
+                      <button onClick={acaoPegar} title="Pegar item próximo"
+                        className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#1e293b', color: '#e2e8f0' }}>📦 Pegar</button>
+                      <button onClick={acaoGerar} title="Colocar comida no chão"
+                        className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#1e293b', color: '#fde68a' }}>🍖 Gerar</button>
+                      <button onClick={acaoDefender} title="Defesa ativa (reflete golpes)"
+                        className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#1e3a8a', color: '#bfdbfe' }}>🛡 Defender</button>
+                    </>
+                  )}
+                  {jogador && selecionado && !selecionado.isCriador && (
+                    <>
+                      <button onClick={acaoAtacar}
+                        className="px-3 py-2 rounded-xl text-xs font-black" style={{ background: '#7f1d1d', color: '#fecaca' }}>⚔ Atacar</button>
+                      <button onClick={acaoInteragir}
+                        className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#064e3b', color: '#a7f3d0' }}>✨ Interagir</button>
                     </>
                   )}
                   {jogador && (

@@ -35,7 +35,13 @@
     "trader": { "nome": "Trader de Dados", "ganho": 80, "custoEnergia": 35, "geraCultura": 0, "tipo": "online", "riscoSaude": 15, "reqTracoMin": { "curiosidade": 65 }, "reqIdea": "algoritmo" },
     "researcher": { "nome": "Researcher", "ganho": 30, "custoEnergia": 25, "geraCultura": 8, "tipo": "online", "reqTracoMin": { "curiosidade": 70 }, "reqIdea": "rede_neural" },
     "content_creator": { "nome": "Content Creator", "ganho": 50, "custoEnergia": 20, "geraCultura": 10, "tipo": "online", "reqTracoMin": { "criatividade": 65, "sociabilidade": 50 }, "reqIdea": "arte_gen" },
-    "hacker": { "nome": "Hacker de Dados", "ganho": 70, "custoEnergia": 40, "geraCultura": 0, "tipo": "online", "riscoSaude": 12, "reqTracoMin": { "curiosidade": 60 } }
+    "hacker": { "nome": "Hacker de Dados", "ganho": 70, "custoEnergia": 40, "geraCultura": 0, "tipo": "online", "riscoSaude": 12, "reqTracoMin": { "curiosidade": 60 } },
+    "minerador": { "nome": "Minerador da Mina de Dados", "ganho": 55, "custoEnergia": 35, "geraCultura": 0, "tipo": "offline", "reqFerramenta": "picareta", "reqTracoMin": { "coragem": 55 } },
+    "medico": { "nome": "Médico Sem Fronteiras", "ganho": 50, "custoEnergia": 30, "geraCultura": 4, "tipo": "offline", "reqConstrucao": "hospital" },
+    "professor_aula": { "nome": "Professor da Aula Pública", "ganho": 30, "custoEnergia": 20, "geraCultura": 8, "tipo": "offline", "reqSkill": "pedagogia" },
+    "explorador": { "nome": "Explorador do Mundo Aberto", "ganho": 38, "custoEnergia": 28, "geraCultura": 5, "tipo": "offline", "reqTracoMin": { "coragem": 50 } },
+    "engenheiro": { "nome": "Engenheiro do Multiverso", "ganho": 60, "custoEnergia": 32, "geraCultura": 6, "tipo": "offline", "reqIdea": "iot" },
+    "bufao": { "nome": "Bufão do Multiverso", "ganho": 22, "custoEnergia": 12, "geraCultura": 9, "tipo": "offline", "reqTracoMin": { "sociabilidade": 60 } }
   },
   "skills": {
     "descricao": "Competências aprendidas na escola e evoluídas na academia. Cada profissão de conhecimento exige a sua skill.",
@@ -147,6 +153,42 @@
           { "nome": "Trilha Antiga", "cor": "#1c1917", "w": 220, "h": 80 }
         ],
         "ruas": [{ "nome": "Caminho da Fauna", "w": 560, "h": 8 }]
+      },
+      {
+        "nome": "Arquipélago Prismático",
+        "zonas": [
+          { "nome": "Praia de Vidro", "cor": "#0e7490", "w": 190, "h": 130 },
+          { "nome": "Porto Canoro", "cor": "#1e3a8a", "w": 150, "h": 110 },
+          { "nome": "Jardins Flutuantes", "cor": "#065f46", "w": 170, "h": 120 }
+        ],
+        "ruas": [{ "nome": "Avenida das Marés", "w": 560, "h": 10 }]
+      },
+      {
+        "nome": "Vulcão de Ideias",
+        "zonas": [
+          { "nome": "Cratera Creativa", "cor": "#7c2d12", "w": 160, "h": 120 },
+          { "nome": "Galerias de Magma", "cor": "#713f12", "w": 140, "h": 100 },
+          { "nome": "Oficinas a Vapor", "cor": "#78350f", "w": 180, "h": 110 }
+        ],
+        "ruas": [{ "nome": "Calçada de Lava", "w": 560, "h": 10 }]
+      },
+      {
+        "nome": "Cume Oracular",
+        "zonas": [
+          { "nome": "Anfiteatro das Visões", "cor": "#4c1d95", "w": 180, "h": 130 },
+          { "nome": "Terraço das Estrelas", "cor": "#312e81", "w": 150, "h": 110 },
+          { "nome": "Miradouro do Criador", "cor": "#1e1b4b", "w": 130, "h": 100 }
+        ],
+        "ruas": [{ "nome": "Estrada dos Presságios", "w": 560, "h": 10 }]
+      },
+      {
+        "nome": "Mercado Estelar",
+        "zonas": [
+          { "nome": "Feira de Nebulosas", "cor": "#831843", "w": 200, "h": 140 },
+          { "nome": "Cais dos Cometas", "cor": "#4a044e", "w": 150, "h": 110 },
+          { "nome": "Vila Flutuante", "cor": "#500724", "w": 160, "h": 120 }
+        ],
+        "ruas": [{ "nome": "Rota das Caravanas", "w": 560, "h": 12 }]
       }
     ]
   },

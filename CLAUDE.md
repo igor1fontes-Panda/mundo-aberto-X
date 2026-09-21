@@ -37,7 +37,7 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 
 ```bash
 npm install   # Vite, React, Three.js, Recharts
-npm test      # 28 smoke tests do engine (Node puro)
+npm test      # 32 smoke tests do engine (Node puro)
 npm run dev   # dev server Vite em http://localhost:3000 (0.0.0.0, usa PORT)
 npm run build # gen + vite build → dist/ (produção)
 ```
@@ -46,7 +46,7 @@ Deploy: **Vercel** (framework Vite, output `dist/`) e **hosting Freebuff** (`npm
 
 ## Ao mudar o código
 
-- Testar sempre `npm test` após tocar no `engine.js` — os 28 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta) e v6.1 (Protocolos da Continuidade + dimensões do mundo/colocação/bolsa).
+- Testar sempre `npm test` após tocar no `engine.js` — os 32 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade) e v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios).
 - **Arquitetura Vite.** `src/` é a fonte; o bundle sai em `dist/` via `npm run build`. O `engine.js` NÃO é importado como módulo (é CJS para os testes Node): o script `gen` copia-o para `public/engine.js` e o `index.html` carrega-o como script global antes do React. Se mexeres no `engine.js`, o `gen` sincroniza automaticamente ao correr `dev`/`build`.
 - O `index.html` tem painel de erro de boot que mostra a exceção em vez do loading eterno.
 - Three.js: manter o mapa dentro de `src/Mapa3D.jsx`; sincronizações de estado correm no rAF loop lendo props via ref (evita re-renders por tick).

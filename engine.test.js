@@ -326,5 +326,68 @@ teste('v6.1: bolsa de estudo sai do fundo comum', () => {
   expect(al.necessidades.dinheiro === CFG.skills.bolsaAula, 'estudante recebeu a bolsa');
 });
 
+// ============ v8: combate, itens, profissões novas, mundo expandido ============
+
+teste('v8: Criador ataca habitante — nunca mata e guarda defende', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  const alvo = m.agentes.find(a => !a.isCriador);
+  alvo.x = m.jogador.x; alvo.y = m.jogador.y; // alcançável
+  const saudeAntes = alvo.necessidades.saude;
+  const r = E.jogadorAtacar(m, alvo.id);
+  expect(r.ok, 'ataque falhou: ' + r.erro);
+  expect(alvo.necessidades.saude < saudeAntes, 'dano não aplicado');
+  expect(alvo.necessidades.saude >= 1, 'ataque não pode matar diretamente');
+  expect(alvo.estado === 'vivo', 'ataque não pode matar');
+  // Criador é intocável
+  const r2 = E.atacarAgente(m, alvo.id, m.jogador.id);
+  expect(!r2.ok && /fora da simulação/.test(r2.erro), 'Criador devia ser intocável');
+});
+
+teste('v8: defesa reduz o dano e reflite; expira no tick seguinte', () => {
+  const m = E.criarMundo(CFG);
+  const at = m.agentes[0], alvo = m.agentes[1];
+  at.x = alvo.x; at.y = alvo.y;
+  E.defenderAtivado(m, alvo.id);
+  expect(alvo.defesaAtiva === true, 'defesa não ativou');
+  const r = E.atacarAgente(m, at.id, alvo.id);
+  expect(r.ok && r.defendido, 'defesa não refletiu no resultado');
+  E.tick(m); // expirarDefesas
+  expect(alvo.defesaAtiva === false, 'defesa devia expirar');
+});
+
+teste('v8: gerar item no chão e pegar perto', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 1000;
+  const rg = E.jogadorGerarItem(m, 'comida');
+  expect(rg.ok, 'gerar item falhou: ' + rg.erro);
+  expect(m.itensNoChao.length === 1, 'item não spawnou');
+  // coloca o jogador em cima do item e apanha
+  const it = m.itensNoChao[0];
+  E.jogadorMover(m, it.x, it.y);
+  const rp = E.jogadorPegar(m);
+  expect(rp.ok, 'pegar falhou: ' + rp.erro);
+  expect(m.itensNoChao.length === 0, 'item não foi consumido');
+  // comida recolhida não vai para o inventário (uso imediato)
+  expect(!m.jogador.inventario.includes('comida'), 'comida não é inventariável');
+});
+
+teste('v8: expandir mundo semeia itens e 20 profissões carregam', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  const r = E.jogadorExpandirMapa(m);
+  expect(r.ok, 'expansão falhou: ' + r.erro);
+  expect(m.chunksComprados === 1, 'chunk não registado');
+  expect((m.itensNoChao || []).length >= 2, 'expansão não semeou itens');
+  expect(Object.keys(CFG.profissoes).length >= 20, 'profissões novas em falta');
+  // deserializar mantém itensNoChao
+  const dados = JSON.parse(E.serializar(m));
+  const m2 = E.criarMundo(CFG);
+  expect(E.deserializar(m2, dados), 'reimport falhou');
+  expect(m2.itensNoChao.length === m.itensNoChao.length, 'itensNoChao perdido no ciclo JSON');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);

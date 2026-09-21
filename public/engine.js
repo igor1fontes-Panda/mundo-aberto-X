@@ -449,8 +449,13 @@
     }));
     mundo.chunks.push({ id: 'c' + idx, nome: modelo.nome, idx, zonas, ruas });
     mundo.chunksComprados = idx;
-    // A fauna ganha espaço no novo território
+    // A fauna ganha espaço no novo território — e o mundo semeia itens para descobrir
     mundo.faunaMaxExtra = (mundo.faunaMaxExtra || 0) + 4;
+    if (!mundo.itensNoChao) mundo.itensNoChao = [];
+    const spawnX = offX + largura / 2 + (Math.random() * 120 - 60);
+    const spawnY = offY + altura / 2 + (Math.random() * 120 - 60);
+    mundo.itensNoChao.push({ id: gerarId(), itemKey: Math.random() < 0.5 ? 'comida' : 'kit_medico', x: clamp(spawnX, 5, offX + largura - 5), y: clamp(spawnY, 5, offY + altura - 5) });
+    mundo.itensNoChao.push({ id: gerarId(), itemKey: Math.random() < 0.4 ? 'semente' : 'picareta', x: clamp(spawnX + 30, 5, offX + largura - 5), y: clamp(spawnY + 30, 5, offY + altura - 5) });
     logMundo(mundo, `🗺️ ${ag.nome} expandiu o mundo: ${modelo.nome} (+${custo} moedas). Novas ruas: ${modelo.ruas.map(r => r.nome).join(', ')}.`);
     return { ok: true, chunk: modelo.nome, custo };
   }
@@ -592,6 +597,11 @@
       }
     });
     if (vitimas === 0) logMundo(mundo, '✨ A população inteira passou o Gauntlet.');
+  }
+
+  // defesa ativa expira a cada fim de ronda de críticos (não é permanente)
+  function expirarDefesas(mundo) {
+    mundo.agentes.forEach(ag => { if (ag.defesaAtiva) ag.defesaAtiva = false; });
   }
 
   // ---------- CONSTRUÇÕES ----------
@@ -809,6 +819,11 @@
     // v6: protocolos de conduta, fauna e mapa
     aplicarConduta(mundo);
     tickFauna(mundo);
+    expirarDefesas(mundo);
+    // inventário do chão: itens não apanhados evaporam (mundo vivo, sem lixo acumulado)
+    if (mundo.itensNoChao && mundo.itensNoChao.length && mundo.tickCount % fib(6) === 0) {
+      mundo.itensNoChao.splice(0, Math.ceil(mundo.itensNoChao.length / 2));
+    }
     // Fundo comum financia a expansão do mundo (gestores expandem sozinhos)
     if (mundo.tickCount % fib(9) === 0) {
       const patrono = mundo.agentes.find(a => a.estado === 'vivo' && !a.isCriador && a.gestor > 0.7 && a.necessidades.dinheiro >= custoProximoChunk(mundo));
@@ -829,7 +844,121 @@
     agricultor: 'coragem', mercador: 'sociabilidade', guarda: 'coragem',
     artista: 'criatividade', hacker: 'curiosidade', freelancer: 'criatividade',
     trader: 'curiosidade', researcher: 'curiosidade', content_creator: 'sociabilidade',
+    minerador: 'coragem', medico: 'empatia', professor_aula: 'empatia',
+    explorador: 'coragem', engenheiro: 'curiosidade', bufao: 'sociabilidade',
   };
+
+  // ---------- COMBATE LIGEIRO (Gauntlet/guardas/ataques do Criador) ----------
+  // Sem morte direta — dano de saúde + memória; defesa restitui energia e reflete um golpe fraco.
+  function atacarAgente(mundo, atacanteId, alvoId) {
+    const at = mundo.agentes.find(a => a.id === atacanteId);
+    const alvo = mundo.agentes.find(a => a.id === alvoId);
+    if (!at || !alvo) return { ok: false, erro: 'Alvo inválido' };
+    if (at.estado !== 'vivo' || alvo.estado !== 'vivo') return { ok: false, erro: 'Só se combate entre vivos' };
+    if (at === alvo) return { ok: false, erro: 'Não te ataques a ti mesmo' };
+    // Regra de ouro: o Criador está fora da simulação mortal — ninguém o pode atacar
+    if (alvo.isCriador) return { ok: false, erro: 'O Criador está fora da simulação mortal' };
+    const cfg = mundo.cfg;
+    const foiGuarda = alvo.profissao === 'guarda';
+    const foiDefesa = alvo.defesaAtiva || foiGuarda;
+    const base = at.isCriador ? 12 : 8;
+    const dano = Math.max(2, Math.round(base * (foiDefesa ? 0.35 : 1) * (0.7 + Math.random() * 0.6)));
+    alvo.necessidades.saude = clamp(alvo.necessidades.saude - dano);
+    at.necessidades.energia = clamp(at.necessidades.energia - 12);
+    if (foiDefesa) {
+      alvo.necessidades.energia = clamp(alvo.necessidades.energia + 5);
+      at.necessidades.saude = clamp(at.necessidades.saude - Math.max(1, Math.round(dano * 0.4))); // reflexo do golpe
+      if (foiGuarda) logMundo(mundo, `🛡️ O guarda ${alvo.nome} defendeu o território contra ${at.nome}!`);
+    }
+    const verb = at.isCriador ? '⚔️ O Criador' : '⚔️ ' + at.nome;
+    logMundo(mundo, `${verb} atacou ${alvo.nome} (−${dano} saúde${foiDefesa ? ', defesa refletiu' : ''}).`);
+    alvo.memorias.unshift({ texto: at.isCriador ? `O Criador atacou-me (−${dano} saúde)` : `${at.nome} atacou-me!`, ts: Date.now(), peso: 8 });
+    if (alvo.necessidades.saude <= 0) {
+      alvo.necessidades.saude = 1; // nunca mata diretamente — o metabolismo decide
+      alvo.defesaAtiva = false;
+    }
+    return { ok: true, dano, defendido: foiDefesa };
+  }
+  function defenderAtivado(mundo, agId) {
+    const ag = mundo.agentes.find(a => a.id === agId);
+    if (!ag) return { ok: false, erro: 'Agente inválido' };
+    if (ag.estado !== 'vivo') return { ok: false, erro: 'Só vivos podem defender' };
+    if (ag.necessidades.energia < 15) return { ok: false, erro: 'Energia insuficiente' };
+    ag.necessidades.energia = clamp(ag.necessidades.energia - 8);
+    ag.defesaAtiva = true;
+    logMundo(mundo, `🛡️ ${ag.nome} ergueu a guarda (defesa ativa).`);
+    return { ok: true };
+  }
+  function pegarItemNoMundo(mundo, agId) {
+    const ag = mundo.agentes.find(a => a.id === agId);
+    if (!ag) return { ok: false, erro: 'Agente inválido' };
+    if (ag.estado !== 'vivo') return { ok: false, erro: 'Só vivos podem pegar itens' };
+    const cfg = mundo.cfg;
+    if (!mundo.itensNoChao) mundo.itensNoChao = [];
+    const perto = mundo.itensNoChao
+      .map((it, i) => ({ it, i, d: Math.hypot(it.x - ag.x, it.y - ag.y) }))
+      .filter(o => o.d < 40)
+      .sort((a, b) => a.d - b.d)[0];
+    if (!perto) return { ok: false, erro: 'Nada por perto para pegar (usa ⛏ Gerar Item)' };
+    mundo.itensNoChao.splice(perto.i, 1);
+    const nomeItem = (cfg.ferramentas[perto.it.itemKey] || {}).nome || perto.it.itemKey;
+    if (perto.it.itemKey === 'kit_medico') {
+      ag.necessidades.saude = clamp(ag.necessidades.saude + 30);
+      return { ok: true, msg: `Kit de reparo usado: +30 saúde 💗` };
+    }
+    if (perto.it.itemKey === 'comida') {
+      ag.necessidades.fome = clamp(ag.necessidades.fome - 35);
+      return { ok: true, msg: 'Comida recolhida: fome −35 🍖' };
+    }
+    if (!ag.inventario.includes(perto.it.itemKey)) ag.inventario.push(perto.it.itemKey);
+    return { ok: true, msg: `Pegaste: ${nomeItem} 🎒` };
+  }
+
+  // O Criador (ou um gestor generoso) espalha um item no chão para ser apanhado
+  function gerarItemNoMundo(mundo, agId, itemKey) {
+    const ag = mundo.agentes.find(a => a.id === agId);
+    const cfg = mundo.cfg;
+    if (!ag) return { ok: false, erro: 'Agente inválido' };
+    if (itemKey !== 'comida' && itemKey !== 'kit_medico' && !cfg.ferramentas[itemKey]) return { ok: false, erro: 'Item desconhecido' };
+    if (itemKey !== 'comida' && itemKey !== 'kit_medico' && ag.necessidades.dinheiro < cfg.ferramentas[itemKey].custo) {
+      return { ok: false, erro: 'Dinheiro insuficiente' };
+    }
+    if (itemKey !== 'comida' && itemKey !== 'kit_medico') ag.necessidades.dinheiro -= cfg.ferramentas[itemKey].custo;
+    const d = dimensoesMundo(mundo);
+    if (!mundo.itensNoChao) mundo.itensNoChao = [];
+    mundo.itensNoChao.push({ id: gerarId(), itemKey, x: clamp(ag.x + (Math.random() * 80 - 40), 5, d.w - 5), y: clamp(ag.y + (Math.random() * 80 - 40), 5, d.h - 5) });
+    return { ok: true, msg: `Item colocado no chão ⛏` };
+  }
+
+  // Interagir com um habitante: elogio eleva o ânimo; perguntar devolve a voz dele
+  function jogadorInteragirSer(mundo, agId, tipo) {
+    const j = mundo.jogador;
+    const ag = mundo.agentes.find(a => a.id === agId);
+    if (!j || !ag) return { ok: false, erro: 'Alvo inválido' };
+    if (tipo === 'elogiar') {
+      ag.memorias.unshift({ texto: 'O Criador elogiou o meu trabalho ✨', ts: Date.now(), peso: 6 });
+      ag.necessidades.energia = clamp(ag.necessidades.energia + 10);
+      ag.gestor = Math.min(mundo.cfg.lumebrain.gestorMaximo, ag.gestor + 0.01);
+      logMundo(mundo, `✨ O Criador elogiou ${ag.nome}.`);
+      return { ok: true, msg: `${ag.nome} ficou motivado ✨` };
+    }
+    if (tipo === 'falar') {
+      const lang = ag.idioma === 'en' ? 'en' : 'pt';
+      return { ok: true, msg: `${ag.nome}: “${falarAgente(mundo, ag, lang)}”` };
+    }
+    return { ok: false, erro: 'Ação desconhecida' };
+  }
+
+  function jogadorAtacar(mundo, alvoId) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    return atacarAgente(mundo, j.id, alvoId);
+  }
+  function jogadorDefender(mundo) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    return defenderAtivado(mundo, j.id);
+  }
 
   function cuidarFaunaAcao(mundo, ag) {
     const cfg = mundo.cfg;
@@ -961,6 +1090,19 @@
   }
 
   // O Criador define a carreira de um habitante (respeitando requisitos v6)
+  // Wrappers de jogador para as ações de mundo (combate/itens/interação)
+  function jogadorGerarItem(mundo, itemKey) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    return gerarItemNoMundo(mundo, j.id, itemKey);
+  }
+  function jogadorPegar(mundo) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    return pegarItemNoMundo(mundo, j.id);
+  }
+
+  // O Criador define a carreira de um habitante (respeitando requisitos v6)
   function jogadorDefinirCarreira(mundo, agId, profissao) {
     const cfg = mundo.cfg;
     const ag = mundo.agentes.find(a => a.id === agId);
@@ -990,7 +1132,7 @@
       log: mundo.log, lume: { tokens: mundo.lume.tokens, bigramas: mundo.lume.bigramas },
       chats: mundo.chats, jogadorId: mundo.jogador ? mundo.jogador.id : null,
       chunks: mundo.chunks, chunksComprados: mundo.chunksComprados,
-      fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0,
+      fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
     }, null, 2);
   }
 
@@ -1013,6 +1155,7 @@
     mundo.fauna = dados.fauna || null;
     mundo.fundoComum = dados.fundoComum || 0;
     mundo.faunaMaxExtra = dados.faunaMaxExtra || 0;
+    mundo.itensNoChao = dados.itensNoChao || [];
     mundo.construcoes = dados.construcoes || [];
     mundo.ideias = dados.ideias || [];
     mundo.gauntletRonda = dados.gauntletRonda || 0;
@@ -1032,6 +1175,8 @@
     tick, rodadaCriticos, gauntlet, construir, pesquisarIdea,
     enviarChat, mudarIdioma, falarAgente,
     jogadorComprar, jogadorOfertar, jogadorDarFerramenta, jogadorConstruir, jogadorPesquisar, jogadorMover,
+    jogadorInteragirSer, jogadorAtacar, jogadorDefender, jogadorGerarItem, jogadorPegar,
+    atacarAgente, defenderAtivado, pegarItemNoMundo, gerarItemNoMundo,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,
     jogadorDefinirCarreira, dimensoesMundo,
     estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, custoProximoChunk, temConstrucao,

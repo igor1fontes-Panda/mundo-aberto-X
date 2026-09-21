@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 /* ============================================================
    MAPA 3D TOP-DOWN — Three.js (câmera ortográfica inclinada)
@@ -122,6 +125,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(0x0b1026, 1);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     renderer.domElement.style.display = 'block';
@@ -134,13 +139,25 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     const dir = new THREE.DirectionalLight(0xffffff, 1.15);
     dir.position.set(300, 400, -160);
     scene.add(amb, dir);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.camera.near = 50;
+    dir.shadow.camera.far = 1400;
+    dir.shadow.bias = -0.0005;
+    dir.shadow.normalBias = 0.02;
+    // pós-processamento: bloom ligeiro (lamps/vagalumes/emojis brilham)
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(800, 420), 0.45, 0.7, 0.82);
+    composer.addPass(bloomPass);
 
     const terrainGroup = new THREE.Group();
     const agentsGroup = new THREE.Group();
     const faunaGroup = new THREE.Group();
     const ringsGroup = new THREE.Group();
     const envGroup = new THREE.Group(); // nuvens, estrelas, vagalumes (uma vez só)
-    scene.add(terrainGroup, agentsGroup, faunaGroup, ringsGroup, envGroup);
+    const itemsGroup = new THREE.Group();
+    scene.add(terrainGroup, agentsGroup, faunaGroup, ringsGroup, envGroup, itemsGroup);
 
     let groundMesh = null;
     let zoom = 1;
@@ -156,6 +173,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     let fireflies = null;
     const agentsMap = new Map();
     const faunaMap = new Map();
+    const itemsMap = new Map();
 
     const selRing = new THREE.Mesh(
       new THREE.TorusGeometry(11, 1.4, 8, 40),
@@ -184,6 +202,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       camera.far = 4000;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
+      composer.setSize(w, h);
     }
 
     /* ---------- HABITANTE ANIME CHIBI ---------- */
@@ -273,8 +292,27 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       g.add(nome);
 
       g.userData.anim = { legs, arms, head, body };
+      g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
     }
+    /* ---------- ITENS NO CHÃO ---------- */
+    const ITEM_EMOJI = { comida: '🍖', kit_medico: '💗', semente: '🌱', picareta: '⛏', livro: '📖', laptop: '💻' };
+    function makeItem(it) {
+      const g = new THREE.Group();
+      const gem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(2.2),
+        new THREE.MeshLambertMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.5 })
+      );
+      gem.position.y = 1.5;
+      g.add(gem);
+      const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(ITEM_EMOJI[it.itemKey] || '📦'), depthTest: false, transparent: true }));
+      emoji.scale.set(9, 9, 1);
+      emoji.position.y = 8;
+      emoji.renderOrder = 9;
+      g.add(emoji);
+      return g;
+    }
+
     /* ---------- FAUNA FOFA ---------- */
     function makeFauna(an) {
       const cor = new THREE.Color(an.cor || '#fb923c');
@@ -312,6 +350,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       emoji.renderOrder = 9;
       g.add(emoji);
       g.userData.anim = { head, tail, body };
+      g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
     }
 
@@ -371,6 +410,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       );
       groundMesh.rotation.x = -Math.PI / 2;
       groundMesh.position.set(w / 2, 0, h / 2);
+      groundMesh.receiveShadow = true;
       groundMesh.userData = { kind: 'terreno' };
       terrainGroup.add(groundMesh);
       const mapa = C.mapa;
@@ -396,6 +436,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             new THREE.MeshLambertMaterial({ color: 0xb08d57 })
           );
           areia.rotation.x = -Math.PI / 2;
+          areia.receiveShadow = true;
           areia.position.set(lx + lw / 2, 0.06, lz + lh / 2);
           terrainGroup.add(areia);
           const geo = new THREE.PlaneGeometry(lw, lh, 12, 8);
@@ -417,6 +458,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             new THREE.MeshLambertMaterial({ color: new THREE.Color(z.cor), transparent: true, opacity: 0.92 })
           );
           zm.rotation.x = -Math.PI / 2;
+          zm.receiveShadow = true;
           zm.position.set(offX + z.x + z.w / 2, 0.08, offY + z.y + z.h / 2);
           terrainGroup.add(zm);
           const zn = labelSprite(z.nome, 'rgba(255,255,255,0.55)');
@@ -430,6 +472,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             new THREE.MeshLambertMaterial({ color: 0x57503c })
           );
           rm.rotation.x = -Math.PI / 2;
+          rm.receiveShadow = true;
           rm.position.set(offX + r.x + r.w / 2, 0.12, offY + r.y + r.h / 2);
           terrainGroup.add(rm);
           // postes de luz ao longo da rua (máx 6)
@@ -453,6 +496,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           if (!livre) continue;
           const tr = makeTree(rand);
           tr.position.set(x, 0, z);
+          tr.traverse(o => { if (o.isMesh) o.castShadow = true; });
           terrainGroup.add(tr);
           plantadas++;
         }
@@ -468,6 +512,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             new THREE.MeshLambertMaterial({ color: 0x64748b })
           );
           rocha.position.set(x, 0.9, z);
+          rocha.castShadow = true;
           rocha.rotation.set(rand() * 3, rand() * 3, rand() * 3);
           terrainGroup.add(rocha);
         }
@@ -499,6 +544,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           new THREE.MeshLambertMaterial({ color: corBase, emissive: corBase.clone().multiplyScalar(0.22) })
         );
         box.position.set(bx, altura / 2, bz);
+        box.castShadow = true;
         box.userData = { kind: 'construcao', nome: def.nome, efeito: def.efeito };
         terrainGroup.add(box);
         const telhado = new THREE.Mesh(
@@ -516,6 +562,11 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       });
       // luz direcional centrada no mundo
       dir.position.set(w / 2, 420, h / 2 - 180);
+      dir.shadow.camera.left = -Math.max(w, 700);
+      dir.shadow.camera.right = Math.max(w, 700);
+      dir.shadow.camera.top = Math.max(h, 700);
+      dir.shadow.camera.bottom = -Math.max(h, 700);
+      dir.shadow.camera.updateProjectionMatrix();
       dir.target.position.set(w / 2, 0, h / 2);
 
       // ---------- ambiente vivo (uma vez só) ----------
@@ -664,6 +715,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         agentsMap.clear();
         faunaMap.forEach(g => { disposeDeep(g); faunaGroup.remove(g); });
         faunaMap.clear();
+        itemsMap.forEach(g => { disposeDeep(g); itemsGroup.remove(g); });
+        itemsMap.clear();
       }
       if (mundo.chunks.length !== lastChunks || mundo.construcoes.length !== lastBuilds) {
         lastChunks = mundo.chunks.length;
@@ -745,6 +798,10 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         A.legs[1].position.y = 1.8 + Math.max(0, -Math.sin(walkT)) * (moving ? 1.0 : 0);
         const bob = moving ? Math.abs(Math.sin(walkT)) * 0.9 : Math.sin(t * 2 + h * 0.05) * 0.3;
         g.position.y = bob + (sel ? 2 + Math.sin(t * 3) * 0.6 : 0);
+        // poses idle: respiração subtil e olhar curioso quando parado
+        A.body.scale.set(1, 1 + Math.sin(t * 2.1 + h * 0.07) * 0.03, 1);
+        A.head.rotation.y = moving ? 0 : Math.sin(t * 0.55 + h * 0.11) * 0.22;
+        A.head.rotation.z = moving ? 0 : Math.sin(t * 0.4 + h * 0.05) * 0.05;
       });
       for (const [id, g] of agentsMap) {
         if (!vivos.has(id)) { disposeDeep(g); agentsGroup.remove(g); agentsMap.delete(id); }
@@ -781,6 +838,18 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (!bichos.has(id)) { disposeDeep(g); faunaGroup.remove(g); faunaMap.delete(id); }
       }
 
+      // itens no chão: gemas flutuantes que giram
+      const itens = new Set();
+      (mundo.itensNoChao || []).forEach(it => {
+        itens.add(it.id);
+        let g = itemsMap.get(it.id);
+        if (!g) { g = makeItem(it); itemsMap.set(it.id, g); itemsGroup.add(g); }
+        g.position.set(it.x, 2.2 + Math.sin(t * 2.6 + hashId(it.id)) * 0.8, it.y);
+        g.rotation.y = t * 1.4;
+      });
+      for (const [id, g] of itemsMap) {
+        if (!itens.has(id)) { disposeDeep(g); itemsGroup.remove(g); itemsMap.delete(id); }
+      }
       // anéis de seleção/alvo
       const selAg = mundo.agentes.find(a => a.id === cb.selecionadoId && (a.estado === 'vivo' || a.isCriador));
       if (selAg) { selRing.visible = true; selRing.position.set(selAg.x, 0.3, selAg.y); selRing.rotation.z = t * 1.2; }
@@ -797,7 +866,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       }
       camera.position.set(target.x, 400, target.y + 170);
       camera.lookAt(target.x, 0, target.y);
-      renderer.render(scene, camera);
+      composer.render();
     }
     raf = requestAnimationFrame(frame);
 
@@ -810,6 +879,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       dom.removeEventListener('wheel', onWheel);
       disposeDeep(scene);
       renderer.dispose();
+      composer.dispose?.();
       if (dom.parentNode === mount) mount.removeChild(dom);
       threeRef.current = null;
     };

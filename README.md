@@ -30,7 +30,7 @@
 
 ```bash
 npm install   # Vite, React, Three.js, Recharts
-npm test      # 28 smoke tests do engine
+npm test      # 32 smoke tests do engine
 npm run dev   # dev server em http://localhost:3000 (usa PORT para mudar)
 npm run build # produção → dist/
 ```
