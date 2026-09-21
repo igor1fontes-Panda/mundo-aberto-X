@@ -65,6 +65,15 @@ function emojiCacheKeyOf() { return null; } // mapas de emoji são partilhados �
 const FIB = n => { let a = 1, b = 1; for (let i = 0; i < n; i++) { [a, b] = [b, a + b]; } return a; };
 const FIB8 = FIB(8); // 21 — igual ao engine
 
+// IDs do engine são strings ("m1abc123") — hash numérico estável p/ variações/rotação
+// (aritmética direta com string → NaN → posição invisível no Three.js)
+function hashId(id) {
+  if (typeof id === 'number') return id;
+  let h = 0;
+  for (let i = 0; i < String(id).length; i++) h = (h * 31 + String(id).charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna, onMover, onSelecionar, onFauna }) {
   const mountRef = useRef(null);
   const threeRef = useRef(null);
@@ -370,7 +379,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         let g = agentsMap.get(ag.id);
         if (!g) { g = makeAgente(ag); agentsMap.set(ag.id, g); agentsGroup.add(g); }
         const sel = ag.id === cb.selecionadoId;
-        g.position.set(ag.x, sel ? 2 + Math.sin(t * 3) * 0.6 : Math.sin(t * 2 + ag.id) * 0.5, ag.y);
+        g.position.set(ag.x, sel ? 2 + Math.sin(t * 3) * 0.6 : Math.sin(t * 2 + hashId(ag.id)) * 0.5, ag.y);
         g.children[1].material.opacity = ag.estado === 'morto' ? 0.35 : 1;
       });
       for (const [id, g] of agentsMap) {
@@ -382,8 +391,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         bichos.add(an.id);
         let g = faunaMap.get(an.id);
         if (!g) { g = makeFauna(an); faunaMap.set(an.id, g); faunaGroup.add(g); }
-        g.position.set(an.x, Math.sin(t * 2.4 + an.id) * 1.6, an.y);
-        g.rotation.y = t * (0.6 + (an.id % 3) * 0.2);
+        g.position.set(an.x, Math.sin(t * 2.4 + hashId(an.id)) * 1.6, an.y);
+        g.rotation.y = t * (0.6 + (hashId(an.id) % 3) * 0.2);
       });
       for (const [id, g] of faunaMap) {
         if (!bichos.has(id)) { disposeDeep(g); faunaGroup.remove(g); faunaMap.delete(id); }
