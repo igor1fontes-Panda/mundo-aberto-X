@@ -107,9 +107,8 @@ export default function App() {
     setTimeout(() => setToast(null), 2600);
   }, []);
 
-  // ----- Game loop -----
+  // ----- Game loop — o mundo corre sempre; desinstalar a app é a única pausa -----
   useEffect(() => {
-    if (velIdx < 0) return; // pausa
     const iv = setInterval(() => {
       const m = mundoRef.current;
       E.tick(m);
@@ -235,7 +234,6 @@ export default function App() {
 
   // ----- Movimento contínuo (d-pad/touch) -----
   useEffect(() => {
-    if (velIdx < 0) return;
     const iv = setInterval(() => {
       const d = dirRef.current;
       if (d && mundoRef.current.jogador) {
@@ -297,11 +295,11 @@ export default function App() {
             <StatPill emoji="🎨" valor={Math.round(m.culturaGlobal)} titulo="Cultura global" />
             <StatPill emoji="⚔️" valor={ticksParaGauntlet} titulo="Ticks até ao próximo Gauntlet" />
             <StatPill emoji="🕯️" valor={'ronda ' + m.criticos.ronda} titulo="Ronda dos críticos (intervalo fib(N))" />
-            <div className="flex rounded-lg overflow-hidden border border-slate-700">
-              {['⏸', '▶', '⏩', '⚡'].map((s, i) => (
-                <button key={i} onClick={() => setVelIdx(i - 1)}
+            <div className="flex rounded-lg overflow-hidden border border-slate-700" title="Velocidade do mundo — corre sempre">
+              {['▶', '⏩', '⚡'].map((s, i) => (
+                <button key={i} onClick={() => setVelIdx(i)}
                   className="px-2 py-1 text-xs font-bold transition-colors"
-                  style={{ background: velIdx === i - 1 ? '#0e7490' : 'transparent', color: velIdx === i - 1 ? '#fff' : '#94a3b8' }}>
+                  style={{ background: velIdx === i ? '#0e7490' : 'transparent', color: velIdx === i ? '#fff' : '#94a3b8' }}>
                   {s}
                 </button>
               ))}
