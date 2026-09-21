@@ -165,9 +165,316 @@
       chunksComprados: 0,
       fauna: null,
       fundoComum: 0,
+      // v9: RPG anime mundo aberto — missões, diplomacia, justiça, história, Kardashev
+      missoes: [],           // board de missões (quest board)
+      diplomacia: null,      // { pactos, guerra, tensao, reputacaoCriador, processoPaz }
+      tribunal: null,        // { casos: [] }
+      historia: null,        // { arcoAtivo, capitulo, eventos }
+      kardashev: null,       // { nivel, energia }
+      npcs: null,            // v8.1: preenchido logo abaixo (missões de comboio precisam deles)
     };
+    mundo.npcs = criarNpcsInicial(mundo);
     mundo.fauna = criarFaunaInicial(mundo);
     return mundo;
+  }
+
+  // ============ v9: DIRETRIZES RPG ANIME MUNDO ABERTO ============
+  // Missões (quest board estilo Genshin), diplomacia entre facções
+  // (guerra & paz com tensão e maioria áurea), tribunal (justiça com
+  // jurados), arcos de história anime por capítulos e a escala de
+  // Kardashev (sociedade tipo 0 → III).
+
+  function cfgRpg(mundo) { return mundo.cfg.rpg || {}; }
+
+  // ----- MISSÕES (quest board) -----
+  function gerarMissao(mundo) {
+    const cfg = cfgRpg(mundo);
+    const templates = (cfg.missoes && cfg.missoes.modelos) || [];
+    if (!templates.length) return null;
+    const t = pick(templates);
+    const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador);
+    if (!vivos.length) return null;
+    const dono = pick(vivos);
+    const dificuldadeN = Math.min(6, 1 + Math.floor(mundo.tickCount / fib(6)));
+    // local físico no terreno (v9.1): o Criador viaja até lá para impulsionar a missão
+    const d = dimensoesMundo(mundo);
+    const alvo = (t.alvo === 'ponto' || t.alvo === 'ponto_fixo')
+      ? { x: clamp(60 + Math.random() * (d.w - 120), 20, d.w - 20), y: clamp(60 + Math.random() * (d.h - 120), 20, d.h - 20) }
+      : null;
+    // comboio (v9.2): missões de escolta levam um NPC real a atravessar o mundo
+    let escoltadoId = null;
+    if (t.comboio && mundo.npcs && mundo.npcs.length) {
+      const pa = zonaPonto(mundo, t.pontoA);
+      const npcLivre = pick(mundo.npcs);
+      if (pa) { npcLivre.x = pa.x; npcLivre.y = pa.y; } // o NPC espera na origem
+      escoltadoId = npcLivre.id;
+    }
+    return {
+      id: gerarId(), tipo: t.id, nome: t.nome, emoji: t.emoji,
+      descricao: t.descricao, dono: dono.nome, donoId: dono.id,
+      dificuldade: dificuldadeN,
+      recompensa: t.recompensa * dificuldadeN,
+      progresso: 0, meta: t.meta * dificuldadeN,
+      alvo,
+      escoltadoId,
+      pronta: false, concluida: false, aceite: false, criadaEm: mundo.tickCount,
+    };
+  }
+  function tickMissoes(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.missoes) return;
+    if (!mundo.missoes) mundo.missoes = [];
+    const boardMax = cfg.missoes.boardMax || 5;
+    // o board renova a cada fib(5)=5 ticks
+    if (mundo.tickCount % fib(5) === 0 && mundo.missoes.filter(q => !q.concluida).length < boardMax) {
+      const q = gerarMissao(mundo);
+      if (q) {
+        mundo.missoes.push(q);
+        logMundo(mundo, q.emoji + ' Nova missão no quadro: ' + q.nome + ' (' + q.recompensa + '🪙)');
+      }
+    }
+    // progresso: agentes vivos a trabalhar contribuem; missões físicas (alvo)
+    // só avançam com o Criador no terreno, junto do marcador
+    const j = mundo.jogador;
+    mundo.missoes.forEach(q => {
+      if (q.concluida) return;
+      const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.profissao !== 'desempregado');
+      if (q.comboio && q.aceite) {
+        // comboio (v9.2): o NPC escoltado segue o Criador; progresso = distância percorrida
+        if (j && q.escoltadoId && q.alvo) {
+          const npc = (mundo.npcs || []).find(nn => nn.id === q.escoltadoId);
+          if (npc) {
+            if (Math.hypot(npc.x - j.x, npc.y - j.y) < 60) {
+              // NPC perto do Criador: persegue-o
+              const dx = j.x - npc.x, dy = j.y - npc.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              const passo = Math.min(3.4, dist);
+              npc.x = clamp(npc.x + (dx / dist) * passo, 5, dimensoesMundo(mundo).w - 5);
+              npc.y = clamp(npc.y + (dy / dist) * passo, 5, dimensoesMundo(mundo).h - 5);
+              q.progresso = Math.min(q.meta, q.progresso + 0.5); // a viagem em escolta avança
+            }
+            // chegada: ambos junto do destino termina a escolta
+            if (Math.hypot(npc.x - q.alvo.x, npc.y - q.alvo.y) < 40 && Math.hypot(j.x - q.alvo.x, j.y - q.alvo.y) < 40) {
+              q.progresso = q.meta;
+            }
+          }
+        }
+      } else if (q.alvo) {
+        // missão física: o esforço do Criador no terreno vale 2/tick; a sociedade
+        // avança devagar por si (1 a cada 3 ticks) para o quadro não entupir
+        if (j && q.aceite && Math.hypot(j.x - q.alvo.x, j.y - q.alvo.y) < 45) {
+          q.progresso = Math.min(q.meta, q.progresso + 2);
+        } else if (vivos.length > 2 && mundo.tickCount % 3 === 0) {
+          q.progresso = Math.min(q.meta, q.progresso + 1);
+        }
+      } else if (vivos.length > 2) {
+        q.progresso = Math.min(q.meta, q.progresso + 1);
+      }
+      if (q.progresso >= q.meta) q.pronta = true;
+    });
+  }
+  function aceitarMissao(mundo, missaoId) {
+    if (!mundo.missoes) return { ok: false, erro: 'Sem quadro de missões' };
+    const q = mundo.missoes.find(x => x.id === missaoId);
+    if (!q) return { ok: false, erro: 'Missão não encontrada' };
+    if (q.concluida) return { ok: false, erro: 'Missão já concluída' };
+    q.aceite = true;
+    q.aceiteEm = mundo.tickCount;
+    if (q.alvo) logMundo(mundo, '📜 ' + q.nome + ': o Criador partiu para o terreno (' + Math.round(q.alvo.x) + ', ' + Math.round(q.alvo.y) + ').');
+    else logMundo(mundo, '📜 O Criador aceitou a missão: ' + q.nome);
+    return { ok: true, missao: q };
+  }
+  function completarMissao(mundo, missaoId) {
+    const q = (mundo.missoes || []).find(x => x.id === missaoId);
+    if (!q) return { ok: false, erro: 'Missão não encontrada' };
+    if (!q.pronta) return { ok: false, erro: 'Missão em progresso (' + q.progresso + '/' + q.meta + ')' };
+    q.concluida = true;
+    const j = mundo.jogador;
+    // Recompensa física (v9.2): metade do valor vem num baú que cai no chão
+    // junto do Criador — ir buscá-lo faz parte da aventura
+    if (j && q.recompensa >= 40) {
+      const d = dimensoesMundo(mundo);
+      if (!mundo.itensNoChao) mundo.itensNoChao = [];
+      mundo.itensNoChao.push({ id: gerarId(), itemKey: 'bau_missao', valor: Math.ceil(q.recompensa / 2),
+        x: clamp(j.x + (Math.random() * 50 - 25), 10, d.w - 10), y: clamp(j.y + (Math.random() * 50 - 25), 10, d.h - 10) });
+      j.necessidades.dinheiro += q.recompensa - Math.ceil(q.recompensa / 2);
+    } else if (j) {
+      j.necessidades.dinheiro += q.recompensa;
+    }
+    if (j) j.contribuicoes = (j.contribuicoes || 0) + 1;
+    mundo.culturaGlobal += q.dificuldade * 2;
+    if (mundo.diplomacia) mundo.diplomacia.reputacaoCriador = clamp((mundo.diplomacia.reputacaoCriador || 0) + 5, 0, 100);
+    logMundo(mundo, '✅ Missão concluída: ' + q.nome + ' (+' + q.recompensa + '🪙, +cultura)');
+    return { ok: true, recompensa: q.recompensa };
+  }
+
+  // ----- DIPLOMACIA: guerra & paz entre facções -----
+  function tickDiplomacia(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.diplomacia) return;
+    if (!mundo.diplomacia) {
+      mundo.diplomacia = { pactos: [], guerra: null, tensao: 0, reputacaoCriador: 20, processoPaz: 0 };
+    }
+    const D = mundo.diplomacia;
+    const faccoes = Object.keys(mundo.cfg.faccoes).filter(f => f !== 'independente');
+    if (faccoes.length < 2) return;
+    // tensão sobe com a desigualdade entre facções e desce com a cultura
+    const porFaccao = faccoes.map(f => {
+      const membros = mundo.agentes.filter(a => a.faccao === f && a.estado === 'vivo' && !a.isCriador);
+      return membros.reduce((sum, a) => sum + a.necessidades.dinheiro, 0);
+    });
+    const spread = porFaccao.length > 1 ? Math.max(...porFaccao) - Math.min(...porFaccao) : 0;
+    D.tensao = clamp(D.tensao + 0.8 + spread / 2000 - mundo.culturaGlobal / 4000, 0, 100);
+    // guerra rebenta quando a tensão atinge o limiar (89 ≈ fib(11))
+    if (!D.guerra && D.tensao >= (cfg.diplomacia.limiarGuerra || 89)) {
+      const [a, b] = faccoes;
+      D.guerra = { faccaoA: a, faccaoB: b, desde: mundo.tickCount, baixasA: 0, baixasB: 0 };
+      logMundo(mundo, '⚔️ GUERRA! ' + mundo.cfg.faccoes[a].nome + ' vs ' + mundo.cfg.faccoes[b].nome + ' — a tensão rebentou.');
+    }
+    if (D.guerra) {
+      // confrontos a cada fib(6)=8 ticks
+      if (mundo.tickCount % fib(6) === 0) {
+        ['faccaoA', 'faccaoB'].forEach((k, i) => {
+          const inimigo = i === 0 ? 'faccaoB' : 'faccaoA';
+          const atacantes = mundo.agentes.filter(a => a.faccao === D.guerra[k] && a.estado === 'vivo' && !a.isCriador);
+          const alvos = mundo.agentes.filter(a => a.faccao === D.guerra[inimigo] && a.estado === 'vivo' && !a.isCriador);
+          if (atacantes.length && alvos.length) {
+            const at = pick(atacantes), al = pick(alvos);
+            const dano = 8 + Math.floor(Math.random() * 10);
+            al.necessidades.saude = clamp(al.necessidades.saude - dano);
+            if (i === 0) D.guerra.baixasB += dano; else D.guerra.baixasA += dano;
+            al.memorias.unshift({ texto: 'Combati na guerra entre facções', ts: Date.now(), peso: 9 });
+          }
+        });
+      }
+      // paz: cultura alta ou mediação do Criador (reputação ≥ φ×100)
+      const podeMediar = (D.reputacaoCriador || 0) >= 61.8;
+      D.processoPaz = clamp(D.processoPaz + (mundo.culturaGlobal / 800) + (podeMediar ? 4 : 0), 0, 100);
+      if (D.processoPaz >= 100) {
+        logMundo(mundo, '🕊️ PAZ assinada entre ' + mundo.cfg.faccoes[D.guerra.faccaoA].nome + ' e ' + mundo.cfg.faccoes[D.guerra.faccaoB].nome + '.');
+        D.pactos.push({ faccaoA: D.guerra.faccaoA, faccaoB: D.guerra.faccaoB, desde: mundo.tickCount, tipo: 'paz' });
+        D.guerra = null; D.tensao = 0; D.processoPaz = 0;
+      }
+    } else if (D.tensao < 30 && Math.random() < 0.05) {
+      // tempos de paz podem gerar pactos de troca
+      const [a, b] = faccoes;
+      if (!D.pactos.some(pr => pr.tipo === 'troca' && pr.desde > mundo.tickCount - fib(7))) {
+        D.pactos.push({ faccaoA: a, faccaoB: b, desde: mundo.tickCount, tipo: 'troca' });
+        logMundo(mundo, '🤝 ' + mundo.cfg.faccoes[a].nome + ' e ' + mundo.cfg.faccoes[b].nome + ' assinaram um pacto de troca.');
+      }
+    }
+  }
+  function mediarPaz(mundo) {
+    const D = mundo.diplomacia;
+    if (!D || !D.guerra) return { ok: false, erro: 'Não há guerra para mediar' };
+    const rep = D.reputacaoCriador || 0;
+    if (rep < 30) return { ok: false, erro: 'Reputação insuficiente (mín. 30) — conclui missões' };
+    D.processoPaz = clamp(D.processoPaz + 20 + rep / 5, 0, 100);
+    logMundo(mundo, '🕊️ O Criador mediou a paz (' + Math.round(D.processoPaz) + '% do processo).');
+    return { ok: true, processo: D.processoPaz };
+  }
+
+  // ----- JUSTIÇA: tribunal de casos -----
+  function tickJustica(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.justica) return;
+    if (!mundo.tribunal) mundo.tribunal = { casos: [] };
+    // crimes nascem do stress social: guerra + agentes feridos podem ser acusados
+    if (mundo.tickCount % fib(6) === 0 && mundo.diplomacia && mundo.diplomacia.guerra && Math.random() < 0.4) {
+      const acusados = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.necessidades.saude < 60);
+      if (acusados.length) {
+        const ac = pick(acusados);
+        if (!mundo.tribunal.casos.some(c => c.acusadoId === ac.id && !c.julgado)) {
+          const crime = pick((cfg.justica && cfg.justica.crimes) || [{ id: 'rebeldia', nome: 'Rebeldia', pena: 20 }]);
+          mundo.tribunal.casos.push({
+            id: gerarId(), acusadoId: ac.id, acusado: ac.nome, crime: crime.nome,
+            pena: crime.pena, julgado: false, veredicto: null, criadoEm: mundo.tickCount,
+          });
+          logMundo(mundo, '⚖️ Acusação aberta: ' + ac.nome + ' responde por ' + crime.nome + '.');
+        }
+      }
+    }
+    // julgamento a cada fib(5)=5 ticks (ou fib(3)=2 com Tribunal construído);
+    // jurados votam, maioria áurea absolve
+    const intervaloJulgamento = temConstrucao(mundo, 'tribunal') ? fib(3) : fib(5);
+    if (mundo.tickCount % intervaloJulgamento === 0) {
+      const caso = mundo.tribunal.casos.find(c => !c.julgado);
+      if (caso) {
+        const jurados = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.id !== caso.acusadoId);
+        if (jurados.length >= 2) {
+          let inocente = 0;
+          jurados.forEach(jur => { if (Math.random() < 0.5 + (jur.tracos.empatia || 0) / 400) inocente++; });
+          const absolvido = inocente >= jurados.length * 0.618; // maioria áurea
+          caso.julgado = true;
+          caso.veredicto = absolvido ? 'absolvido' : 'culpado';
+          const ac = mundo.agentes.find(a => a.id === caso.acusadoId);
+          if (!absolvido && ac) {
+            const penaFinal = temConstrucao(mundo, 'tribunal') ? Math.round(caso.pena / 2) : caso.pena;
+            ac.necessidades.dinheiro = Math.max(0, ac.necessidades.dinheiro - penaFinal);
+            ac.memorias.unshift({ texto: 'Fui julgado e declarado culpado', ts: Date.now(), peso: 7 });
+          }
+          logMundo(mundo, '⚖️ ' + caso.acusado + ' foi ' + (absolvido ? 'ABSOLVIDO' : 'condenado') + ' por ' + caso.crime + '.');
+        }
+      }
+    }
+  }
+
+  // ----- HISTÓRIA: arcos narrativos (sagas anime por capítulos) -----
+  function tickHistoria(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.historia) return;
+    if (!mundo.historia) mundo.historia = { arcoAtivo: null, capitulo: 0, eventos: [] };
+    const H = mundo.historia;
+    // novo arco quando não há nenhum ativo (verificação a cada fib(8)=21 ticks)
+    if (!H.arcoAtivo && mundo.tickCount % fib(8) === 0) {
+      const arcos = (cfg.historia.arcos || []);
+      if (arcos.length) {
+        const idx = H.eventos.length % arcos.length;
+        const arco = arcos[idx];
+        H.arcoAtivo = { id: arco.id, nome: arco.nome, emoji: arco.emoji, sinopse: arco.sinopse, capitulo: 1, capituloMax: arco.capitulos, progresso: 0 };
+        H.capitulo = 1;
+        logMundo(mundo, arco.emoji + ' ARCO: "' + arco.nome + '" — ' + arco.sinopse);
+      }
+    }
+    // progresso do capítulo: cultura + missões concluídas
+    if (H.arcoAtivo) {
+      H.arcoAtivo.progresso += (mundo.culturaGlobal % 10) / 20 + (mundo.missoes || []).filter(q => q.concluida).length * 0.2;
+      if (H.arcoAtivo.progresso >= 10) {
+        H.arcoAtivo.progresso = 0;
+        if (H.arcoAtivo.capitulo < H.arcoAtivo.capituloMax) {
+          H.arcoAtivo.capitulo++;
+          logMundo(mundo, H.arcoAtivo.emoji + ' ' + H.arcoAtivo.nome + ' — capítulo ' + H.arcoAtivo.capitulo + '/' + H.arcoAtivo.capituloMax + '.');
+        } else {
+          logMundo(mundo, '🌟 ARCO CONCLUÍDO: ' + H.arcoAtivo.nome + '! O mundo lembra-se desta saga.');
+          H.eventos.push({ arco: H.arcoAtivo.nome, concluidoEm: mundo.tickCount });
+          H.arcoAtivo = null;
+          mundo.culturaGlobal += 25;
+        }
+      }
+    }
+  }
+
+  // ----- KARDASHEV: sociedade do tipo 0 → III -----
+  function nivelKardashev(mundo) {
+    // energia = cultura + construções + ideias + população, comprimida por φ
+    return Math.min(3, Math.floor(
+      (mundo.culturaGlobal / 500 +
+       mundo.construcoes.length / 8 +
+       mundo.ideias.length / 6 +
+       mundo.agentes.filter(a => a.estado === 'vivo').length / 30) * 0.618
+    ));
+  }
+  function tickKardashev(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.kardashev) return;
+    if (!mundo.kardashev) mundo.kardashev = { nivel: 0, energia: 0 };
+    const novoNivel = nivelKardashev(mundo);
+    if (novoNivel > mundo.kardashev.nivel) {
+      mundo.kardashev.nivel = novoNivel;
+      const nomes = (cfg.kardashev.nomes) || ['Tipo 0', 'Tipo I', 'Tipo II', 'Tipo III'];
+      logMundo(mundo, '🌟 A sociedade evoluiu para ' + nomes[novoNivel] + ' — civilização de nível ' + novoNivel + ' na escala de Kardashev!');
+    }
+    mundo.kardashev.energia = Math.round(mundo.culturaGlobal / 500 * 100);
   }
 
   function entrarComoJogador(mundo, nome) {
@@ -318,7 +625,12 @@
     // A escola tem prioridade absoluta — desbloqueia estudantes, professores e a academia.
     if ((mundo.fundoComum || 0) >= 50) {
       const faltam = Object.keys(mundo.cfg.construcoes).filter(t => !mundo.construcoes.some(c => c.tipo === t));
-      const ordem = faltam.includes('escola') ? ['escola', ...faltam.filter(t => t !== 'escola')] : faltam;
+      // Ordem institucional (v9.2): Escola primeiro (desbloqueia tudo), depois a
+      // Praça das Missões (vida social), depois o Tribunal (justiça — financia a
+      // ideia blockchain que lhe falta), e só então as restantes.
+      const prioridade = ['escola', 'praca_missoes', 'tribunal'];
+      const ordenadas = prioridade.filter(t => faltam.includes(t));
+      const ordem = [...ordenadas, ...faltam.filter(t => !prioridade.includes(t))];
       for (const tipo of ordem) {
         const def = mundo.cfg.construcoes[tipo];
         if (def.reqIdea && !mundo.ideias.includes(def.reqIdea)) {
@@ -379,8 +691,54 @@
     const def = mundo.cfg.fauna.especies[especie] || pick(Object.values(mundo.cfg.fauna.especies));
     const d = dimensoesMundo(mundo);
     return { id: gerarId(), especie, nome: def.nome, emoji: def.emoji, cor: def.cor, velocidade: def.velocidade,
+      forma: def.forma || null, temperamento: def.temperamento || 'selvagem',
       x: 20 + Math.random() * (d.w - 40), y: 20 + Math.random() * (d.h - 40),
-      estado: 'vivo', ferido: false, energia: 80 };
+      estado: 'vivo', ferido: false, energia: 80, rumo: Math.random() * Math.PI * 2 };
+  }
+
+  // Cada espécie anda à sua maneira (v8.1): temperamentos da fauna em mundo.json
+  function decidirRumo(mundo, an) {
+    const d = dimensoesMundo(mundo);
+    const V = an.rumo;
+    switch (an.temperamento) {
+      case 'curioso': { // salta em zigue-zague; aproxima-se do jogador se houver comida à mão
+        if (Math.random() < 0.3) an.rumo = V + (Math.random() - 0.5) * 2.4;
+        break;
+      }
+      case 'esquivo': { // mantém distância do Criador
+        if (mundo.jogador) {
+          const dx = an.x - mundo.jogador.x, dy = an.y - mundo.jogador.y;
+          if (Math.hypot(dx, dy) < 70) an.rumo = Math.atan2(dy, dx);
+        }
+        if (Math.random() < 0.2) an.rumo = V + (Math.random() - 0.5) * 1.2;
+        break;
+      }
+      case 'gregário': { // segue o animal vivo mais próximo
+        const outros = mundo.fauna.filter(o => o.id !== an.id);
+        if (outros.length && Math.random() < 0.5) {
+          const perto = outros.reduce((m, o) => (Math.hypot(o.x - an.x, o.y - an.y) < Math.hypot(m.x - an.x, m.y - an.y) ? o : m), outros[0]);
+          an.rumo = Math.atan2(perto.y - an.y, perto.x - an.x);
+        }
+        break;
+      }
+      case 'protetor': { // ronda perto das zonas habitadas (centro do mapa)
+        if (Math.random() < 0.15) an.rumo = Math.atan2(d.h / 2 - an.y, d.w / 2 - an.x) + (Math.random() - 0.5) * 0.8;
+        break;
+      }
+      case 'dorminhoco': { // muito preguiçoso: quase parado, acorda de vez em quando
+        if (Math.random() > 0.05) return false;
+        an.rumo = Math.random() * Math.PI * 2;
+        break;
+      }
+      case 'paciente': // quase nunca muda de ideias
+      case 'observador':
+      case 'reservado':
+      default:
+        if (Math.random() < 0.1) an.rumo = Math.random() * Math.PI * 2;
+        break;
+    }
+    an.rumo = Math.atan2(Math.sin(an.rumo), Math.cos(an.rumo)); // normaliza
+    return true;
   }
   function tickFauna(mundo) {
     const cfg = mundo.cfg.fauna;
@@ -396,11 +754,79 @@
     }
     const d = dimensoesMundo(mundo);
     mundo.fauna.forEach(an => {
-      an.x = clamp(an.x + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.w - 5);
-      an.y = clamp(an.y + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.h - 5);
+      if (decidirRumo(mundo, an)) {
+        const fomeFator = an.energia < 30 ? 1.4 : 1; // com fome, apressa-se
+        an.x = clamp(an.x + Math.cos(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.w - 5);
+        an.y = clamp(an.y + Math.sin(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.h - 5);
+        an.energia = clamp(an.energia - 0.15, 0, 100);
+      }
       // Ferimentos acontecem; cuidadores e o hospital curam (Protocolo da Fauna)
       if (!an.ferido && Math.random() < 0.01) { an.ferido = true; logMundo(mundo, `🐾 ${an.nome} ficou ferido na natureza.`); }
       if (an.ferido && temConstrucao(mundo, 'hospital') && Math.random() < 0.3) { an.ferido = false; logMundo(mundo, `💗 O hospital curou ${an.nome}.`); }
+    });
+  }
+
+  // ---------- NPCs DE AMBIENTE (v8.1) ----------
+  // Não são agentes: sem LumeBrain, sem economia, sem Gauntlet. São figuras do
+  // pano de fundo que atravessam o mundo a fazer as suas tarefas.
+  function criarNpc(mundo, tipoKey) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return null;
+    const def = cfg.tipos[tipoKey] || pick(Object.values(cfg.tipos));
+    const pa = zonaPonto(mundo, def.pontoA), pb = zonaPonto(mundo, def.pontoB);
+    const inicio = pa || { x: 60, y: 60 };
+    return { id: gerarId(), tipo: tipoKey, nome: def.nome, emoji: def.emoji, cor: def.cor,
+      tarefa: def.tarefa, pontoA: def.pontoA, pontoB: def.pontoB,
+      x: inicio.x + (Math.random() - 0.5) * 30, y: inicio.y + (Math.random() - 0.5) * 30,
+      alvo: pb || inicio, indoParaB: true, pausa: 0 };
+  }
+  function zonaPonto(mundo, zonaId) {
+    if (!zonaId) return null;
+    for (const ch of mundo.chunks) {
+      const z = (ch.zonas || []).find(zz => zz.id === zonaId);
+      if (z) return { x: z.x + z.w / 2, y: z.y + z.h / 2 };
+    }
+    return null;
+  }
+  function criarNpcsInicial(mundo) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return [];
+    const tipos = Object.keys(cfg.tipos);
+    const npcs = [];
+    for (let i = 0; i < Math.min(tipos.length, cfg.max); i++) {
+      const n = criarNpc(mundo, tipos[i % tipos.length]);
+      if (n) npcs.push(n);
+    }
+    return npcs;
+  }
+  function tickNpcs(mundo) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return;
+    if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
+    // Entram novos em saltos Fibonacci (fib(7)=13) até ao máximo — como a fauna
+    if (mundo.npcs.length < cfg.max && mundo.tickCount % fib(7) === 0) {
+      const faltam = Object.keys(cfg.tipos).filter(t => !mundo.npcs.some(n => n.tipo === t));
+      const tipo = faltam.length ? faltam[0] : pick(Object.keys(cfg.tipos));
+      const novo = criarNpc(mundo, tipo);
+      if (novo) { mundo.npcs.push(novo); logMundo(mundo, `🧍 ${novo.nome} chegou ao mundo: ${novo.tarefa}.`); }
+    }
+    const pausaCfg = cfg.pausaTick || 21;
+    const emComboio = new Set((mundo.missoes || []).filter(q => q.comboio && q.aceite && !q.concluida && q.escoltadoId).map(q => q.escoltadoId));
+    mundo.npcs.forEach(n => {
+      if (emComboio.has(n.id)) return; // a seguir o Criador na escolta (tickMissoes move-o)
+      if (n.pausa > 0) { n.pausa--; return; } // parado a fazer a sua tarefa
+      const dx = n.alvo.x - n.x, dy = n.alvo.y - n.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 12) { // chegou: pausa a trabalhar e vira para trás
+        n.pausa = pausaCfg;
+        n.indoParaB = !n.indoParaB;
+        const prox = zonaPonto(mundo, n.indoParaB ? n.pontoB : n.pontoA);
+        if (prox) n.alvo = prox;
+      } else {
+        const passo = 2.2;
+        n.x = clamp(n.x + (dx / dist) * passo, 5, dimensoesMundo(mundo).w - 5);
+        n.y = clamp(n.y + (dy / dist) * passo, 5, dimensoesMundo(mundo).h - 5);
+      }
     });
   }
   function curarAnimal(mundo, animalId) {
@@ -816,9 +1242,16 @@
 
     mundo.culturaGlobal += culturaGerada;
 
-    // v6: protocolos de conduta, fauna e mapa
+    // v6: protocolos de conduta, fauna, NPCs e mapa
     aplicarConduta(mundo);
     tickFauna(mundo);
+    tickNpcs(mundo);
+    // v9: RPG anime mundo aberto
+    tickMissoes(mundo);
+    tickDiplomacia(mundo);
+    tickJustica(mundo);
+    tickHistoria(mundo);
+    tickKardashev(mundo);
     expirarDefesas(mundo);
     // inventário do chão: itens não apanhados evaporam (mundo vivo, sem lixo acumulado)
     if (mundo.itensNoChao && mundo.itensNoChao.length && mundo.tickCount % fib(6) === 0) {
@@ -909,6 +1342,11 @@
     if (perto.it.itemKey === 'comida') {
       ag.necessidades.fome = clamp(ag.necessidades.fome - 35);
       return { ok: true, msg: 'Comida recolhida: fome −35 🍖' };
+    }
+    if (perto.it.itemKey === 'bau_missao') {
+      const valor = perto.it.valor || 0;
+      ag.necessidades.dinheiro += valor;
+      return { ok: true, msg: 'Baú da missão aberto: +' + valor + '🪙 💰' };
     }
     if (!ag.inventario.includes(perto.it.itemKey)) ag.inventario.push(perto.it.itemKey);
     return { ok: true, msg: `Pegaste: ${nomeItem} 🎒` };
@@ -1072,10 +1510,15 @@
     return { w: largura * colunas, h: altura * linhas };
   }
 
-  function jogadorMover(mundo, x, y) {
+  function jogadorMover(mundo, x, y, correr) {
     const j = mundo.jogador; if (!j) return;
     const d = dimensoesMundo(mundo);
-    j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5);
+    // Movimento por toque (v8.1): um passo suave em direcao ao alvo (passo duplo = correr)
+    const passo = correr ? 42 : 20;
+    const dx = x - j.x, dy = y - j.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= passo) { j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5); }
+    else { j.x = clamp(j.x + (dx / dist) * passo, 5, d.w - 5); j.y = clamp(j.y + (dy / dist) * passo, 5, d.h - 5); }
   }
 
   function jogadorExpandirMapa(mundo) {
@@ -1133,6 +1576,9 @@
       chats: mundo.chats, jogadorId: mundo.jogador ? mundo.jogador.id : null,
       chunks: mundo.chunks, chunksComprados: mundo.chunksComprados,
       fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
+      npcs: mundo.npcs || null,
+      missoes: mundo.missoes || [], diplomacia: mundo.diplomacia || null,
+      tribunal: mundo.tribunal || null, historia: mundo.historia || null, kardashev: mundo.kardashev || null,
     }, null, 2);
   }
 
@@ -1156,6 +1602,15 @@
     mundo.fundoComum = dados.fundoComum || 0;
     mundo.faunaMaxExtra = dados.faunaMaxExtra || 0;
     mundo.itensNoChao = dados.itensNoChao || [];
+    // v8.1: NPCs de ambiente (migração: mundos antigos não os têm)
+    if (dados.npcs && dados.npcs.length) mundo.npcs = dados.npcs;
+    else if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
+    // v9: RPG (migração silenciosa de mundos antigos)
+    mundo.missoes = dados.missoes || [];
+    mundo.diplomacia = dados.diplomacia || null;
+    mundo.tribunal = dados.tribunal || null;
+    mundo.historia = dados.historia || null;
+    mundo.kardashev = dados.kardashev || null;
     mundo.construcoes = dados.construcoes || [];
     mundo.ideias = dados.ideias || [];
     mundo.gauntletRonda = dados.gauntletRonda || 0;
@@ -1179,7 +1634,8 @@
     atacarAgente, defenderAtivado, pegarItemNoMundo, gerarItemNoMundo,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,
     jogadorDefinirCarreira, dimensoesMundo,
-    estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, custoProximoChunk, temConstrucao,
+    estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, criarNpcsInicial, custoProximoChunk, temConstrucao,
+    aceitarMissao, completarMissao, mediarPaz, nivelKardashev,
     serializar, deserializar, logMundo, clamp, pick, gerarId,
   };
 
