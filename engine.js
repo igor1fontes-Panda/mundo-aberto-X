@@ -171,7 +171,9 @@
       tribunal: null,        // { casos: [] }
       historia: null,        // { arcoAtivo, capitulo, eventos }
       kardashev: null,       // { nivel, energia }
+      npcs: null,            // v8.1: preenchido logo abaixo (missões de comboio precisam deles)
     };
+    mundo.npcs = criarNpcsInicial(mundo);
     mundo.fauna = criarFaunaInicial(mundo);
     return mundo;
   }
@@ -199,6 +201,14 @@
     const alvo = (t.alvo === 'ponto' || t.alvo === 'ponto_fixo')
       ? { x: clamp(60 + Math.random() * (d.w - 120), 20, d.w - 20), y: clamp(60 + Math.random() * (d.h - 120), 20, d.h - 20) }
       : null;
+    // comboio (v9.2): missões de escolta levam um NPC real a atravessar o mundo
+    let escoltadoId = null;
+    if (t.comboio && mundo.npcs && mundo.npcs.length) {
+      const pa = zonaPonto(mundo, t.pontoA);
+      const npcLivre = pick(mundo.npcs);
+      if (pa) { npcLivre.x = pa.x; npcLivre.y = pa.y; } // o NPC espera na origem
+      escoltadoId = npcLivre.id;
+    }
     return {
       id: gerarId(), tipo: t.id, nome: t.nome, emoji: t.emoji,
       descricao: t.descricao, dono: dono.nome, donoId: dono.id,
@@ -206,6 +216,7 @@
       recompensa: t.recompensa * dificuldadeN,
       progresso: 0, meta: t.meta * dificuldadeN,
       alvo,
+      escoltadoId,
       pronta: false, concluida: false, aceite: false, criadaEm: mundo.tickCount,
     };
   }
@@ -228,7 +239,27 @@
     mundo.missoes.forEach(q => {
       if (q.concluida) return;
       const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.profissao !== 'desempregado');
-      if (q.alvo) {
+      if (q.comboio && q.aceite) {
+        // comboio (v9.2): o NPC escoltado segue o Criador; progresso = distância percorrida
+        if (j && q.escoltadoId && q.alvo) {
+          const npc = (mundo.npcs || []).find(nn => nn.id === q.escoltadoId);
+          if (npc) {
+            if (Math.hypot(npc.x - j.x, npc.y - j.y) < 60) {
+              // NPC perto do Criador: persegue-o
+              const dx = j.x - npc.x, dy = j.y - npc.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              const passo = Math.min(3.4, dist);
+              npc.x = clamp(npc.x + (dx / dist) * passo, 5, dimensoesMundo(mundo).w - 5);
+              npc.y = clamp(npc.y + (dy / dist) * passo, 5, dimensoesMundo(mundo).h - 5);
+              q.progresso = Math.min(q.meta, q.progresso + 0.5); // a viagem em escolta avança
+            }
+            // chegada: ambos junto do destino termina a escolta
+            if (Math.hypot(npc.x - q.alvo.x, npc.y - q.alvo.y) < 40 && Math.hypot(j.x - q.alvo.x, j.y - q.alvo.y) < 40) {
+              q.progresso = q.meta;
+            }
+          }
+        }
+      } else if (q.alvo) {
         // missão física: o esforço do Criador no terreno vale 2/tick; a sociedade
         // avança devagar por si (1 a cada 3 ticks) para o quadro não entupir
         if (j && q.aceite && Math.hypot(j.x - q.alvo.x, j.y - q.alvo.y) < 45) {
@@ -259,10 +290,18 @@
     if (!q.pronta) return { ok: false, erro: 'Missão em progresso (' + q.progresso + '/' + q.meta + ')' };
     q.concluida = true;
     const j = mundo.jogador;
-    if (j) {
+    // Recompensa física (v9.2): metade do valor vem num baú que cai no chão
+    // junto do Criador — ir buscá-lo faz parte da aventura
+    if (j && q.recompensa >= 40) {
+      const d = dimensoesMundo(mundo);
+      if (!mundo.itensNoChao) mundo.itensNoChao = [];
+      mundo.itensNoChao.push({ id: gerarId(), itemKey: 'bau_missao', valor: Math.ceil(q.recompensa / 2),
+        x: clamp(j.x + (Math.random() * 50 - 25), 10, d.w - 10), y: clamp(j.y + (Math.random() * 50 - 25), 10, d.h - 10) });
+      j.necessidades.dinheiro += q.recompensa - Math.ceil(q.recompensa / 2);
+    } else if (j) {
       j.necessidades.dinheiro += q.recompensa;
-      j.contribuicoes = (j.contribuicoes || 0) + 1;
     }
+    if (j) j.contribuicoes = (j.contribuicoes || 0) + 1;
     mundo.culturaGlobal += q.dificuldade * 2;
     if (mundo.diplomacia) mundo.diplomacia.reputacaoCriador = clamp((mundo.diplomacia.reputacaoCriador || 0) + 5, 0, 100);
     logMundo(mundo, '✅ Missão concluída: ' + q.nome + ' (+' + q.recompensa + '🪙, +cultura)');
@@ -586,7 +625,12 @@
     // A escola tem prioridade absoluta — desbloqueia estudantes, professores e a academia.
     if ((mundo.fundoComum || 0) >= 50) {
       const faltam = Object.keys(mundo.cfg.construcoes).filter(t => !mundo.construcoes.some(c => c.tipo === t));
-      const ordem = faltam.includes('escola') ? ['escola', ...faltam.filter(t => t !== 'escola')] : faltam;
+      // Ordem institucional (v9.2): Escola primeiro (desbloqueia tudo), depois a
+      // Praça das Missões (vida social), depois o Tribunal (justiça — financia a
+      // ideia blockchain que lhe falta), e só então as restantes.
+      const prioridade = ['escola', 'praca_missoes', 'tribunal'];
+      const ordenadas = prioridade.filter(t => faltam.includes(t));
+      const ordem = [...ordenadas, ...faltam.filter(t => !prioridade.includes(t))];
       for (const tipo of ordem) {
         const def = mundo.cfg.construcoes[tipo];
         if (def.reqIdea && !mundo.ideias.includes(def.reqIdea)) {
@@ -767,7 +811,9 @@
       if (novo) { mundo.npcs.push(novo); logMundo(mundo, `🧍 ${novo.nome} chegou ao mundo: ${novo.tarefa}.`); }
     }
     const pausaCfg = cfg.pausaTick || 21;
+    const emComboio = new Set((mundo.missoes || []).filter(q => q.comboio && q.aceite && !q.concluida && q.escoltadoId).map(q => q.escoltadoId));
     mundo.npcs.forEach(n => {
+      if (emComboio.has(n.id)) return; // a seguir o Criador na escolta (tickMissoes move-o)
       if (n.pausa > 0) { n.pausa--; return; } // parado a fazer a sua tarefa
       const dx = n.alvo.x - n.x, dy = n.alvo.y - n.y;
       const dist = Math.hypot(dx, dy);
@@ -1296,6 +1342,11 @@
     if (perto.it.itemKey === 'comida') {
       ag.necessidades.fome = clamp(ag.necessidades.fome - 35);
       return { ok: true, msg: 'Comida recolhida: fome −35 🍖' };
+    }
+    if (perto.it.itemKey === 'bau_missao') {
+      const valor = perto.it.valor || 0;
+      ag.necessidades.dinheiro += valor;
+      return { ok: true, msg: 'Baú da missão aberto: +' + valor + '🪙 💰' };
     }
     if (!ag.inventario.includes(perto.it.itemKey)) ag.inventario.push(perto.it.itemKey);
     return { ok: true, msg: `Pegaste: ${nomeItem} 🎒` };

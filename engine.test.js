@@ -537,5 +537,58 @@ teste('v9.1: Tribunal acelera julgamentos e suaviza penas', () => {
   expect(['absolvido', 'culpado'].includes(m.tribunal.casos[0].veredicto), 'veredicto inválido');
 });
 
+// ============ v9.2: comboio, baú físico, fundo comum ergue o Tribunal ============
+
+teste('v9.2: comboio — NPC escoltado segue o Criador e chega ao destino', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  expect(m.npcs && m.npcs.length > 0, 'NPCs deviam existir desde o criarMundo (comboios)');
+  const npc = m.npcs[0];
+  npc.x = 200; npc.y = 150;
+  const q = { id: 'qC', tipo: 'escoltar_menestrel', nome: 'Comboio do Menestrel', emoji: '🎻', descricao: 'x', dono: 'Aria', donoId: m.agentes[0].id,
+    dificuldade: 1, recompensa: 140, progresso: 0, meta: 20, alvo: { x: 380, y: 200 }, escoltadoId: npc.id, comboio: true,
+    pronta: false, concluida: false, aceite: false, criadaEm: 0 };
+  m.missoes = [q];
+  E.aceitarMissao(m, 'qC');
+  expect(q.aceite, 'comboio devia aceitar-se');
+  // Criador anda ao lado do NPC — o NPC persegue-o e o progresso avança
+  for (let i = 0; i < 30; i++) {
+    E.jogadorMover(m, npc.x + 12, npc.y + 5, true);
+    E.tick(m);
+  }
+  expect(q.progresso > 0, 'escolta devia progredir: ' + q.progresso);
+  expect(Math.hypot(npc.x - m.jogador.x, npc.y - m.jogador.y) < 80, 'NPC devia seguir o Criador');
+});
+
+teste('v9.2: recompensa física — baú cai no chão e paga ao ser apanhado', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  const q = { id: 'qB', tipo: 'colher', nome: 'Colheita', emoji: '🌾', descricao: 'x', dono: 'Aria', donoId: m.agentes[0].id,
+    dificuldade: 2, recompensa: 100, progresso: 10, meta: 10, alvo: null, pronta: true, concluida: false, aceite: true, criadaEm: 0 };
+  m.missoes = [q];
+  const moedas0 = m.jogador.necessidades.dinheiro;
+  const r = E.completarMissao(m, 'qB');
+  expect(r.ok, 'recolha falhou');
+  // metade direto, metade no baú
+  expect(m.jogador.necessidades.dinheiro === moedas0 + 50, 'metade devia vir direta: +' + (m.jogador.necessidades.dinheiro - moedas0));
+  const bau = (m.itensNoChao || []).find(it => it.itemKey === 'bau_missao');
+  expect(bau && bau.valor === 50, 'baú devia existir com valor 50');
+  E.jogadorMover(m, bau.x, bau.y, true);
+  const peg = E.jogadorPegar(m);
+  expect(peg.ok && peg.msg.indexOf('70') === -1, 'baú devia ser apanhável');
+  expect(m.jogador.necessidades.dinheiro === moedas0 + 100, 'total devia somar a recompensa completa');
+});
+
+teste('v9.2: fundo comum ergue a Praça das Missões e o Tribunal sozinho', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.fundoComum = 12000;
+  for (let i = 0; i < 40; i++) E.tick(m);
+  expect(m.construcoes.some(c => c.tipo === 'escola'), 'escola continua com prioridade');
+  expect(m.construcoes.some(c => c.tipo === 'praca_missoes'), 'Praça das Missões devia ser erguida pelo fundo');
+  expect(m.construcoes.some(c => c.tipo === 'tribunal'), 'Tribunal devia ser erguido pelo fundo (com blockchain financiada)');
+  expect(m.ideias.includes('blockchain'), 'blockchain devia ter sido financiada para o Tribunal');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);

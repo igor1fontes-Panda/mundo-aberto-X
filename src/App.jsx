@@ -248,10 +248,14 @@ export default function App() {
   const aceitarMissao = (id) => {
     const r = E.aceitarMissao(mundoRef.current, id);
     if (r.ok && r.missao.alvo) {
-      // missão física: o avatar parte automaticamente para o marcador no terreno
+      // missão física: no comboio, o Criador parte ao encontro do NPC; nas outras,
+      // vai direto ao marcador no terreno
       const m2 = mundoRef.current;
-      m2.jogador.x = r.missao.alvo.x; m2.jogador.y = r.missao.alvo.y;
-      mostrarToast('📜 Missão aceite — o avatar partiu para o marcador ' + r.missao.emoji);
+      const destino = r.missao.comboio
+        ? ((m2.npcs || []).find(nn => nn.id === r.missao.escoltadoId) || r.missao.alvo)
+        : r.missao.alvo;
+      m2.jogador.x = destino.x; m2.jogador.y = destino.y;
+      mostrarToast('📜 ' + (r.missao.comboio ? 'Comboio aceite — parte ao encontro do escoltado ' : 'Missão aceite — o avatar partiu para o marcador ') + r.missao.emoji);
       setVista('jogo'); // ver a viagem no mapa
     } else mostrarToast(r.ok ? '📜 Missão aceite' : r.erro, !r.ok);
     repintar();
@@ -515,22 +519,32 @@ export default function App() {
               {(() => {
                 const ativa = (m.missoes || []).find(q => q.aceite && !q.concluida);
                 if (!ativa) return null;
+                const npcEsc = ativa.comboio && ativa.escoltadoId ? (m.npcs || []).find(nn => nn.id === ativa.escoltadoId) : null;
                 return (
                   <div className="rounded-xl border p-2.5 flex items-center gap-2.5" style={{ background: 'rgba(2,6,23,0.8)', borderColor: ativa.pronta ? CORES.vida + '66' : '#1e293b' }}>
                     <span className="text-xl">{ativa.emoji}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-black text-slate-200 truncate">{ativa.nome} {ativa.alvo && <span style={{ color: CORES.ouro }}>📍 físico</span>}</div>
+                      <div className="text-[11px] font-black text-slate-200 truncate">
+                        {ativa.nome} {ativa.comboio && <span style={{ color: '#60a5fa' }}>🧍 comboio{npcEsc ? ': ' + npcEsc.nome : ''}</span>}
+                        {!ativa.comboio && ativa.alvo && <span style={{ color: CORES.ouro }}>📍 físico</span>}
+                      </div>
                       <div className="mt-1 flex items-center gap-2">
                         <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: Math.min(100, (ativa.progresso / ativa.meta) * 100) + '%', background: ativa.pronta ? CORES.vida : CORES.acento }} />
                         </div>
                         <span className="text-[9px] font-mono text-slate-500">{ativa.progresso}/{ativa.meta}</span>
                       </div>
-                      {ativa.alvo && !ativa.pronta && jogador && (
+                      {ativa.comboio && npcEsc && !ativa.pronta && jogador && (
+                        <p className="text-[9px] text-slate-500 mt-0.5">
+                          🧍 Mantém-te perto de {npcEsc.nome} — ele segue-te até ({Math.round(ativa.alvo.x)}, {Math.round(ativa.alvo.y)}) · distância {Math.round(Math.hypot(npcEsc.x - ativa.alvo.x, npcEsc.y - ativa.alvo.y))}m
+                        </p>
+                      )}
+                      {!ativa.comboio && ativa.alvo && !ativa.pronta && jogador && (
                         <p className="text-[9px] text-slate-500 mt-0.5">
                           📍 Chega ao marcador dourado no mapa ({Math.round(ativa.alvo.x)}, {Math.round(ativa.alvo.y)}) · distância {Math.round(Math.hypot(jogador.x - ativa.alvo.x, jogador.y - ativa.alvo.y))}m
                         </p>
                       )}
+                      {ativa.pronta && <p className="text-[9px] mt-0.5" style={{ color: CORES.ouro }}>💰 Metade da recompensa cai num baú no chão junto de ti — vai buscá-lo!</p>}
                     </div>
                     {ativa.pronta && (
                       <button onClick={() => concluirMissao(ativa.id)}

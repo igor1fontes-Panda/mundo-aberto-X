@@ -1200,6 +1200,28 @@
           "recompensa": 90,
           "meta": 30,
           "alvo": "ponto"
+        },
+        {
+          "id": "escoltar_menestrel",
+          "emoji": "🎻",
+          "nome": "Comboio do Menestrel",
+          "descricao": "Escolta o menestrel até à praça distante — ele segue-te, não o percas",
+          "recompensa": 140,
+          "meta": 40,
+          "comboio": true,
+          "pontoA": "vila",
+          "alvo": "ponto_fixo"
+        },
+        {
+          "id": "escoltar_mercador",
+          "emoji": "🛒",
+          "nome": "Comboio do Mercador",
+          "descricao": "Acompanha o vendedor ambulante até ao mercado vizinho em segurança",
+          "recompensa": 120,
+          "meta": 35,
+          "comboio": true,
+          "pontoA": "campos",
+          "alvo": "ponto_fixo"
         }
       ]
     },

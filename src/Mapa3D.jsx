@@ -448,6 +448,28 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     const ITEM_EMOJI = { comida: '🍖', kit_medico: '💗', semente: '🌱', picareta: '⛏', livro: '📖', laptop: '💻' };
     function makeItem(it) {
       const g = new THREE.Group();
+      if (it.itemKey === 'bau_missao') {
+        // baú da missão (v9.2): madeira escura, faixas douradas, aura brilhante
+        const madeira = new THREE.MeshLambertMaterial({ color: 0x6b4226 });
+        const ouro = new THREE.MeshLambertMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.45 });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(5, 3.2, 3.6), madeira);
+        corpo.position.y = 1.6; corpo.castShadow = true; g.add(corpo);
+        const tampa = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 3.6, 12, 1, false, 0, Math.PI), ouro);
+        tampa.rotation.z = Math.PI / 2; tampa.position.y = 3.2; g.add(tampa);
+        for (const fx of [-1.4, 1.4]) {
+          const faixa = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.4, 3.8), ouro);
+          faixa.position.set(fx, 1.7, 0); g.add(faixa);
+        }
+        // aura de "vem buscá-me"
+        const aura = new THREE.Mesh(
+          new THREE.TorusGeometry(3.6, 0.35, 8, 24),
+          new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.7 })
+        );
+        aura.rotation.x = Math.PI / 2; aura.position.y = 0.4;
+        aura.userData.kind = 'aura-bau';
+        g.add(aura);
+        return g;
+      }
       const gem = new THREE.Mesh(
         new THREE.OctahedronGeometry(2.2),
         new THREE.MeshLambertMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.5 })
@@ -1476,8 +1498,16 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         itens.add(it.id);
         let g = itemsMap.get(it.id);
         if (!g) { g = makeItem(it); itemsMap.set(it.id, g); itemsGroup.add(g); }
-        g.position.set(it.x, 2.2 + Math.sin(t * 2.6 + hashId(it.id)) * 0.8, it.y);
-        g.rotation.y = t * 1.4;
+        if (it.itemKey === 'bau_missao') {
+          // baú assenta no chão (não flutua); a aura roda e sobe/desce
+          g.position.set(it.x, 0, it.y);
+          g.rotation.y = t * 0.6;
+          const aura = g.children.find(ch => ch.userData && ch.userData.kind === 'aura-bau');
+          if (aura) { aura.rotation.z = t * 1.8; aura.position.y = 0.4 + Math.sin(t * 2.4) * 0.3; }
+        } else {
+          g.position.set(it.x, 2.2 + Math.sin(t * 2.6 + hashId(it.id)) * 0.8, it.y);
+          g.rotation.y = t * 1.4;
+        }
       });
       for (const [id, g] of itemsMap) {
         if (!itens.has(id)) { disposeDeep(g); itemsGroup.remove(g); itemsMap.delete(id); }
