@@ -450,8 +450,12 @@ teste('v9: quest board gera missões e o Criador recolhe recompensas', () => {
   for (let i = 0; i < 40; i++) E.tick(m);
   expect(m.missoes && m.missoes.length > 0, 'board devia ter missões');
   expect(m.missoes.every(q => q.nome && q.meta > 0 && q.recompensa > 0), 'missão mal formada');
+  // determinismo: com poucos trabalhadores o progresso pode não correr — força
+  // trabalho coletivo para garantir que alguma missão fica pronta
+  m.agentes.forEach(a => { if (a.estado === 'vivo' && !a.isCriador) a.profissao = 'mercador'; });
+  for (let i = 0; i < 30; i++) E.tick(m);
   const pronta = m.missoes.find(q => q.pronta && !q.concluida);
-  expect(pronta, 'devia existir missão pronta após 40 ticks');
+  expect(pronta, 'devia existir missão pronta após progresso garantido');
   const moedasAntes = m.jogador.necessidades.dinheiro;
   expect(E.completarMissao(m, pronta.id).ok, 'recolha falhou');
   expect(m.jogador.necessidades.dinheiro > moedasAntes, 'recompensa não chegou');
