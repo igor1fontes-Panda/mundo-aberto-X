@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
 import Mapa3D from './Mapa3D.jsx';
+import Minimapa from './Minimapa.jsx';
 import CFG from '../mundo.json';
 
 /* ============================================================
@@ -92,6 +93,7 @@ export default function App() {
   const [selecionadoId, setSelecionadoId] = useState(null);
   const [modalCriar, setModalCriar] = useState(false);
   const [tab, setTab] = useState('mundo'); // mundo | construir | sociedade | regras
+  const [vista, setVista] = useState('jogo'); // jogo | dashboard — duas interfaces distintas
   const [novoSer, setNovoSer] = useState({ nome: '', arquetipo: 'humano', faccao: 'independente' });
   const [chatInput, setChatInput] = useState('');
   const [toast, setToast] = useState(null);
@@ -243,6 +245,21 @@ export default function App() {
     mostrarToast(r.ok ? `Território anexado: ${r.chunk}` : r.erro, !r.ok);
     repintar();
   };
+  const aceitarMissao = (id) => {
+    const r = E.aceitarMissao(mundoRef.current, id);
+    mostrarToast(r.ok ? '📜 Missão aceite' : r.erro, !r.ok);
+    repintar();
+  };
+  const concluirMissao = (id) => {
+    const r = E.completarMissao(mundoRef.current, id);
+    mostrarToast(r.ok ? ('✅ +' + r.recompensa + '🪙 · cultura e reputação') : r.erro, !r.ok);
+    repintar();
+  };
+  const mediar = () => {
+    const r = E.mediarPaz(mundoRef.current);
+    mostrarToast(r.ok ? ('🕊️ Mediação: ' + Math.round(r.processo) + '% do processo de paz') : r.erro, !r.ok);
+    repintar();
+  };
   const definirCarreira = (prof) => {
     if (!selecionado) return;
     const r = E.jogadorDefinirCarreira(mundoRef.current, selecionado.id, prof);
@@ -338,11 +355,26 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-3 py-2 flex flex-wrap items-center gap-2">
           <h1 className="text-sm sm:text-base font-black tracking-tight mr-2">
             <span style={{ color: CORES.ouro }}>🌍</span> MUNDO ABERTO <span style={{ color: CORES.acento }}>X</span>
-            <span className="ml-2 text-[10px] font-mono text-slate-500">v{CFG.meta.versao} · tick {m.tickCount} · fib {FIB8}</span>
+            <span className="ml-2 text-[10px] font-mono text-slate-500">tick {m.tickCount} · fib {FIB8}</span>
           </h1>
           <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+            {/* Jogo ↔ Dashboard: duas interfaces distintas */}
+            <div className="flex rounded-xl overflow-hidden border border-slate-700 mr-1" title="Jogo: mapa 3D e ações · Dashboard: informação e política">
+              <button onClick={() => setVista('jogo')}
+                className="px-3 py-1.5 text-xs font-black transition-colors"
+                style={{ background: vista === 'jogo' ? 'linear-gradient(135deg,#0891b2,#7c3aed)' : 'transparent', color: vista === 'jogo' ? '#fff' : '#94a3b8' }}>
+                🎮 Jogo
+              </button>
+              <button onClick={() => setVista('dashboard')}
+                className="px-3 py-1.5 text-xs font-black transition-colors"
+                style={{ background: vista === 'dashboard' ? 'linear-gradient(135deg,#0891b2,#7c3aed)' : 'transparent', color: vista === 'dashboard' ? '#fff' : '#94a3b8' }}>
+                📊 Dashboard
+              </button>
+            </div>
             <StatPill emoji="👥" valor={vivos.length} titulo="População viva" />
             <StatPill emoji="🎨" valor={Math.round(m.culturaGlobal)} titulo="Cultura global" />
+            <StatPill emoji="🌟" valor={'K' + ((m.kardashev && m.kardashev.nivel) || 0)} titulo="Escala de Kardashev (sociedade tipo 0→III)" />
+            <StatPill emoji="🕊️" valor={m.diplomacia ? Math.round(m.diplomacia.reputacaoCriador) : 20} titulo="Reputação do Criador (diplomacia)" />
             <StatPill emoji="⚔️" valor={ticksParaGauntlet} titulo="Ticks até ao próximo Gauntlet" />
             <StatPill emoji="🕯️" valor={'ronda ' + m.criticos.ronda} titulo="Ronda dos críticos (intervalo fib(N))" />
             <div className="flex rounded-lg overflow-hidden border border-slate-700" title="Velocidade do mundo — corre sempre">
@@ -377,8 +409,8 @@ export default function App() {
       )}
 
       <main className="max-w-7xl mx-auto px-3 py-3 grid grid-cols-1 lg:grid-cols-[260px_1fr_320px] gap-3">
-        {/* ============ COLUNA ESQUERDA: HABITANTES ============ */}
-        <section className="rounded-2xl border border-slate-800 p-3 order-2 lg:order-1" style={{ background: CORES.painel }}>
+        {/* ============ COLUNA ESQUERDA: HABITANTES (só na vista Jogo) ============ */}
+        <section className="rounded-2xl border border-slate-800 p-3 order-2 lg:order-1" style={{ background: CORES.painel, display: vista === 'jogo' ? undefined : 'none' }}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Habitantes ({m.agentes.length})</h2>
             <button onClick={() => setModalCriar(true)} className="p-1 rounded-lg border border-slate-700 hover:bg-slate-800" title="Criar habitante"><Icons.Plus className="w-3.5 h-3.5" /></button>
@@ -423,9 +455,18 @@ export default function App() {
           )}
         </section>
 
-        {/* ============ CENTRO: MAPA 3D / ABAS ============ */}
+        {/* ============ CENTRO: MAPA 3D / ABAS / DASHBOARD ============ */}
         <section className="order-1 lg:order-2 space-y-3">
-          <div className="flex gap-1.5">
+          {vista === 'dashboard' && (
+            <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+              <h2 className="text-sm font-black" style={{ color: CORES.ouro }}>📊 Dashboard do Mundo</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Missões, diplomacia, justiça, história e a ascensão Kardashev — tudo o que a sociedade fez enquanto jogaste.
+                Volta ao 🎮 Jogo para agir no mapa.
+              </p>
+            </div>
+          )}
+          <div className="flex gap-1.5" style={{ display: vista === 'jogo' ? undefined : 'none' }}>
             {[['mundo', '🗺️ Mundo'], ['construir', '🏛️ Construir'], ['sociedade', '🏫 Sociedade'], ['regras', '✨ Regras']].map(([t, l]) => (
               <button key={t} onClick={() => setTab(t)}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
@@ -435,13 +476,34 @@ export default function App() {
             ))}
           </div>
 
-          {tab === 'mundo' && (
+          {tab === 'mundo' && vista === 'jogo' && (
             <div>
-              <Mapa3D
-                m={m} CFG={CFG} dim={dim} jogador={jogador}
-                selecionadoId={selecionadoId} alvoFauna={alvoFauna}
-                onMover={moverMapa} onSelecionar={setSelecionadoId} onFauna={setAlvoFauna}
-              />
+              <div className="relative">
+                <Mapa3D
+                  m={m} CFG={CFG} dim={dim} jogador={jogador}
+                  selecionadoId={selecionadoId} alvoFauna={alvoFauna}
+                  onMover={moverMapa} onSelecionar={setSelecionadoId} onFauna={setAlvoFauna}
+                />
+                {/* ===== MINIMAPA overlay (canto): dá acesso à vista estratégica ===== */}
+                <div className="absolute top-2 right-2 z-20 rounded-xl overflow-hidden shadow-2xl backdrop-blur"
+                  style={{ background: 'rgba(2,6,23,0.72)', border: '1px solid #1e293b' }}>
+                  <div className="px-2 pt-1 pb-0.5 flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: CORES.acento }}>🗺️ Minimapa</span>
+                    <button onClick={() => setVista('dashboard')} title="Abrir dashboard (informação completa)"
+                      className="text-[9px] font-bold px-1.5 rounded" style={{ background: '#1e293b', color: '#7dd3fc' }}>📊</button>
+                  </div>
+                  <div className="px-1.5 pb-1.5">
+                    <Minimapa m={m} CFG={CFG} dim={dim} jogador={jogador}
+                      onNavegar={(x, y) => { if (jogador) moverMapa(x, y, false); }}
+                      width={186} height={104} />
+                  </div>
+                  {m.historia && m.historia.arcoAtivo && (
+                    <div className="px-2 pb-1.5 text-[9px] leading-tight" style={{ color: '#c084fc' }}>
+                      {m.historia.arcoAtivo.emoji} {m.historia.arcoAtivo.nome} · cap {m.historia.arcoAtivo.capitulo}/{m.historia.arcoAtivo.capituloMax}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* ===== Controlos touchscreen (Android/mobile): tap no mapa para andar ===== */}
               <div className="flex items-start justify-between gap-2 mt-2">
@@ -510,7 +572,7 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'sociedade' && (
+          {tab === 'sociedade' && vista === 'jogo' && (
             <div className="space-y-3">
               {/* Escola / Academia */}
               <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
@@ -596,7 +658,7 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'construir' && (
+          {tab === 'construir' && vista === 'jogo' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {Object.entries(CFG.construcoes).map(([k, c]) => {
                 const qtd = m.construcoes.filter(x => x.tipo === k).length;
@@ -634,7 +696,7 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'regras' && (
+          {tab === 'regras' && vista === 'jogo' && (
             <div className="rounded-2xl border border-slate-800 p-4 space-y-3 text-xs leading-relaxed" style={{ background: CORES.painel }}>
               <h3 className="text-sm font-black" style={{ color: CORES.ouro }}>As regras do multiverso</h3>
               <p><b style={{ color: CORES.acento }}>Réguas de Fibonacci.</b> O Gauntlet ataca a cada {FIB8} ticks (fib 8), o vocabulário Lume cresce a cada {E.fib(6)} ticks (fib 6), os críticos correm em rondas com intervalo fib(N) e limites na proporção áurea 0.618. A própria moeda de nascimento é 1, 1, 2, 3, 5, 8…</p>
@@ -648,8 +710,8 @@ export default function App() {
           )}
         </section>
 
-        {/* ============ COLUNA DIREITA: PAINEL DO SELECCIONADO ============ */}
-        <section className="rounded-2xl border border-slate-800 p-3 order-3" style={{ background: CORES.painel }}>
+        {/* ============ COLUNA DIREITA: PAINEL DO SELECCIONADO (só no Jogo) ============ */}
+        <section className="rounded-2xl border border-slate-800 p-3 order-3" style={{ background: CORES.painel, display: vista === 'jogo' ? undefined : 'none' }}>
           {!selecionado && (
             <div className="h-full flex flex-col items-center justify-center text-center py-10">
               <span className="text-4xl mb-3 opacity-40">🜂</span>
@@ -784,7 +846,175 @@ export default function App() {
         </section>
       </main>
 
-      {/* ============ GRÁFICO CULTURA ============ */}
+      {/* ============ VISTA DASHBOARD: informação, política e sociedade ============ */}
+      {vista === 'dashboard' && (
+        <main className="max-w-7xl mx-auto px-3 pb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* MISSÕES — quest board estilo anime */}
+          <section className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: CORES.ouro }}>📜 Quadro de Missões</h3>
+              <span className="text-[9px] font-mono text-slate-500">renova a cada fib(5) ticks</span>
+            </div>
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+              {(m.missoes || []).filter(q => !q.concluida).length === 0 && (
+                <p className="text-xs text-slate-600">O quadro aguarda novas comissões…</p>
+              )}
+              {(m.missoes || []).filter(q => !q.concluida).map(q => (
+                <div key={q.id} className="rounded-xl border p-2" style={{ borderColor: q.pronta ? CORES.vida + '66' : '#1e293b', background: '#020617aa' }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">{q.emoji}</span>
+                    <span className="text-[11px] font-bold text-slate-200">{q.nome}</span>
+                    <span className="ml-auto text-[10px] font-mono" style={{ color: CORES.ouro }}>{q.recompensa}🪙</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{q.descricao} · pedido por <b>{q.dono}</b> · dificuldade {'★'.repeat(q.dificuldade)}</p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: Math.min(100, (q.progresso / q.meta) * 100) + '%', background: q.pronta ? CORES.vida : CORES.acento }} />
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-500">{q.progresso}/{q.meta}</span>
+                    {q.pronta && (
+                      <button onClick={() => concluirMissao(q.id)}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: CORES.vida, color: '#052e16' }}>
+                        Recolher
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* DIPLOMACIA — guerra & paz */}
+          <section className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: CORES.ouro }}>🕊️ Diplomacia & Guerra</h3>
+              {m.diplomacia && m.diplomacia.guerra && (
+                <button onClick={mediar} className="px-2.5 py-1 rounded-xl text-[10px] font-black" style={{ background: '#0e7490', color: '#fff' }}>
+                  🕊️ Mediar paz ({Math.round(m.diplomacia.processoPaz)}%)
+                </button>
+              )}
+            </div>
+            {m.diplomacia && m.diplomacia.guerra ? (
+              <div className="rounded-xl border p-2.5 mb-2" style={{ borderColor: CORES.perigo + '55', background: '#450a0a44' }}>
+                <div className="text-xs font-black" style={{ color: CORES.perigo }}>
+                  ⚔️ GUERRA ATIVA: {CFG.faccoes[m.diplomacia.guerra.faccaoA].nome} vs {CFG.faccoes[m.diplomacia.guerra.faccaoB].nome}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Baixas — {CFG.faccoes[m.diplomacia.guerra.faccaoA].nome}: {m.diplomacia.guerra.baixasA} · {CFG.faccoes[m.diplomacia.guerra.faccaoB].nome}: {m.diplomacia.guerra.baixasB} · desde tick {m.diplomacia.guerra.desde}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-800 p-2.5 mb-2" style={{ background: '#052e1633' }}>
+                <span className="text-[11px] font-bold" style={{ color: CORES.vida }}>🕊️ Paz no mundo</span>
+                {m.diplomacia && <span className="text-[10px] text-slate-500 ml-2">tensão: {Math.round(m.diplomacia.tensao)}/89 (limiar fib)</span>}
+              </div>
+            )}
+            {m.diplomacia && (
+              <>
+                <div className="mb-1.5">
+                  <Bar label="Tensão social" valor={m.diplomacia.tensao} cor={m.diplomacia.tensao > 60 ? CORES.perigo : '#fb923c'} />
+                  <Bar label="Reputação do Criador" valor={m.diplomacia.reputacaoCriador || 0} cor={CORES.ouro} />
+                  {m.diplomacia.guerra && <Bar label="Processo de paz" valor={m.diplomacia.processoPaz} cor={CORES.vida} />}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(m.diplomacia.pactos || []).slice(-4).map((pl, i) => (
+                    <Chip key={i} cor={pl.tipo === 'paz' ? CORES.vida : '#60a5fa'}>
+                      {pl.tipo === 'paz' ? '🕊️' : '🤝'} {CFG.faccoes[pl.faccaoA].nome.slice(0, 10)}+{CFG.faccoes[pl.faccaoB].nome.slice(0, 10)}
+                    </Chip>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* JUSTIÇA — tribunal */}
+          <section className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: CORES.ouro }}>⚖️ Justiça do Mundo</h3>
+            {(m.tribunal && m.tribunal.casos.length) ? (
+              <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                {m.tribunal.casos.slice(0, 8).map(c => (
+                  <div key={c.id} className="rounded-xl border border-slate-800 p-2 flex items-center gap-2" style={{ background: '#020617aa' }}>
+                    <span className="text-base">⚖️</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-bold text-slate-200 truncate">{c.acusado}</div>
+                      <div className="text-[10px] text-slate-500">{c.crime} · pena {c.pena}🪙</div>
+                    </div>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                      style={{ background: !c.julgado ? '#1e293b' : c.veredicto === 'absolvido' ? '#052e16' : '#450a0a', color: !c.julgado ? '#94a3b8' : c.veredicto === 'absolvido' ? CORES.vida : CORES.perigo }}>
+                      {c.julgado ? (c.veredicto === 'absolvido' ? '✓ inocente' : '✖ culpado') : 'em julgamento'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-600">Sem processos. Crimes nascem do stress social (guerra, feridos) e são julgados por jurados com maioria áurea.</p>
+            )}
+          </section>
+
+          {/* HISTÓRIA + KARDASHEV */}
+          <section className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: CORES.ouro }}>📖 História & Ascensão</h3>
+            {m.historia && m.historia.arcoAtivo ? (
+              <div className="rounded-xl border p-2.5 mb-2" style={{ borderColor: '#c084fc44', background: '#c084fc0d' }}>
+                <div className="text-xs font-black" style={{ color: '#c084fc' }}>{m.historia.arcoAtivo.emoji} {m.historia.arcoAtivo.nome}</div>
+                <p className="text-[10px] text-slate-400 mt-0.5">{m.historia.arcoAtivo.sinopse}</p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: Math.min(100, (m.historia.arcoAtivo.progresso / 10) * 100) + '%', background: '#c084fc' }} />
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-500">cap {m.historia.arcoAtivo.capitulo}/{m.historia.arcoAtivo.capituloMax}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500 mb-2">Os bardos preparam o próximo arco narrativo… (verificação a cada fib(8) ticks)</p>
+            )}
+            {m.historia && m.historia.eventos.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {m.historia.eventos.slice(-3).map((ev, i) => <Chip key={i} cor="#c084fc">🌟 {ev.arco}</Chip>)}
+              </div>
+            )}
+            {m.kardashev && (
+              <div className="rounded-xl border border-slate-800 p-2.5" style={{ background: '#020617aa' }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black" style={{ color: '#7dd3fc' }}>🌟 Escala de Kardashev</span>
+                  <span className="text-[10px] font-mono text-slate-400">energia ≈ {m.kardashev.energia}%</span>
+                </div>
+                <div className="flex gap-1 mt-1.5">
+                  {['Tipo 0', 'Tipo I', 'Tipo II', 'Tipo III'].map((nome, i) => (
+                    <div key={i} className="flex-1 text-center py-1 rounded-lg text-[9px] font-black"
+                      style={{ background: i <= m.kardashev.nivel ? 'linear-gradient(135deg,#0891b2,#7c3aed)' : '#1e293b', color: i <= m.kardashev.nivel ? '#fff' : '#64748b' }}>
+                      {nome}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1">Cultura + construções + ideias + população, comprimidas por φ — a sociedade sobe de tipo ao evoluir.</p>
+              </div>
+            )}
+          </section>
+
+          {/* GRÁFICO CULTURA (movido para o dashboard) */}
+          <section className="rounded-2xl border border-slate-800 p-3 lg:col-span-2" style={{ background: CORES.painel }}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Cultura global ao longo dos ticks</h3>
+              <span className="text-[10px] font-mono text-slate-600">Réguas de Fibonacci · φ = 0.618</span>
+            </div>
+            <div style={{ height: 120 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={histCultura}>
+                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+                  <XAxis dataKey="tick" tick={{ fill: '#475569', fontSize: 9 }} />
+                  <YAxis tick={{ fill: '#475569', fontSize: 9 }} width={30} />
+                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', fontSize: 11 }} />
+                  <Line type="monotone" dataKey="cultura" stroke={CORES.acento} strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* ============ GRÁFICO CULTURA (vista jogo) ============ */}
+      {vista === 'jogo' && (
       <footer className="max-w-7xl mx-auto px-3 pb-6">
         <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
           <div className="flex items-center justify-between mb-1">
@@ -805,6 +1035,7 @@ export default function App() {
           <p className="text-[10px] text-slate-600 mt-1">Mundo Aberto X — agentes AI autónomos em 3D, língua emergente Lume, LumeBrain gestor, Gauntlet de Fibonacci. Feito com Codebuff ✦</p>
         </div>
       </footer>
+      )}
 
       {/* ============ MODAL CRIAR HABITANTE ============ */}
       {modalCriar && (

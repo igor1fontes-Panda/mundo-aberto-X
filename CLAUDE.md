@@ -12,8 +12,8 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 |---|---|
 | `mundo.json` | **Fonte de verdade da configuração**: profissões, ferramentas, construções, ideias, zonas do mapa, eventos do Gauntlet, sementes da língua Lume, parâmetros do LumeBrain. Números de balance mudam AQUI, não no código. |
 | `engine.js` | Motor puro (sem React/DOM). Fibonacci, língua Lume, LumeBrain, loop de críticos, Gauntlet, jogador, serialização. Expõe `window.Engine` no browser e `module.exports` em Node. O script `gen` copia-o para `public/engine.js`. |
-| `src/App.jsx` | UI React (JSX transformado pelo Vite). Painéis, chat, gráficos Recharts, controlos touch. |
-| `src/Mapa3D.jsx` | Mapa **3D top-down** (Three.js, câmera ortográfica): chunks/zonas/ruas, construções em caixas 3D, agentes/fauna animados, pan/zoom/clique. |
+| `src/App.jsx` | UI React (JSX transformado pelo Vite). Duas interfaces: 🎮 Jogo (mapa 3D + ações + minimapa) e 📊 Dashboard (missões, diplomacia, justiça, história, Kardashev, gráficos). |
+| `src/Minimapa.jsx` | Minimapa 2D (canvas) do mundo inteiro: zonas, construções, seres, Criador; clique navega no 3D. |
 | `src/main.jsx` | Entrada Vite: monta o App e injeta o Vercel Speed Insights. |
 | `index.html` | Shell Vite. Carrega `/engine.js` (global) antes do módulo React. Tem painel de erro de boot — se algo falhar, o erro aparece no ecrã em vez de loading eterno. |
 | `public/engine.js` | **Cópia gerada** do `engine.js` pelo script `gen` (corre em `dev` e `build`) — é isto que o browser carrega. |
@@ -46,7 +46,7 @@ Deploy: **Vercel** (framework Vite, output `dist/`) e **hosting Freebuff** (`npm
 
 ## Ao mudar o código
 
-- Testar sempre `npm test` após tocar no `engine.js` — os 39 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas).
+- Testar sempre `npm test` após tocar no `engine.js` — os 42 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas), v9 (quest board, guerra & paz com mediação, tribunal, arcos de história, Kardashev).
 - **Arquitetura Vite.** `src/` é a fonte; o bundle sai em `dist/` via `npm run build`. O `engine.js` NÃO é importado como módulo (é CJS para os testes Node): o script `gen` copia-o para `public/engine.js` e o `index.html` carrega-o como script global antes do React. Se mexeres no `engine.js`, o `gen` sincroniza automaticamente ao correr `dev`/`build`.
 - O `index.html` tem painel de erro de boot que mostra a exceção em vez do loading eterno.
 - Three.js: manter o mapa dentro de `src/Mapa3D.jsx`; sincronizações de estado correm no rAF loop lendo props via ref (evita re-renders por tick).

@@ -165,9 +165,254 @@
       chunksComprados: 0,
       fauna: null,
       fundoComum: 0,
+      // v9: RPG anime mundo aberto — missões, diplomacia, justiça, história, Kardashev
+      missoes: [],           // board de missões (quest board)
+      diplomacia: null,      // { pactos, guerra, tensao, reputacaoCriador, processoPaz }
+      tribunal: null,        // { casos: [] }
+      historia: null,        // { arcoAtivo, capitulo, eventos }
+      kardashev: null,       // { nivel, energia }
     };
     mundo.fauna = criarFaunaInicial(mundo);
     return mundo;
+  }
+
+  // ============ v9: DIRETRIZES RPG ANIME MUNDO ABERTO ============
+  // Missões (quest board estilo Genshin), diplomacia entre facções
+  // (guerra & paz com tensão e maioria áurea), tribunal (justiça com
+  // jurados), arcos de história anime por capítulos e a escala de
+  // Kardashev (sociedade tipo 0 → III).
+
+  function cfgRpg(mundo) { return mundo.cfg.rpg || {}; }
+
+  // ----- MISSÕES (quest board) -----
+  function gerarMissao(mundo) {
+    const cfg = cfgRpg(mundo);
+    const templates = (cfg.missoes && cfg.missoes.modelos) || [];
+    if (!templates.length) return null;
+    const t = pick(templates);
+    const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador);
+    if (!vivos.length) return null;
+    const dono = pick(vivos);
+    const dificuldadeN = Math.min(6, 1 + Math.floor(mundo.tickCount / fib(6)));
+    return {
+      id: gerarId(), tipo: t.id, nome: t.nome, emoji: t.emoji,
+      descricao: t.descricao, dono: dono.nome, donoId: dono.id,
+      dificuldade: dificuldadeN,
+      recompensa: t.recompensa * dificuldadeN,
+      progresso: 0, meta: t.meta * dificuldadeN,
+      pronta: false, concluida: false, aceite: false, criadaEm: mundo.tickCount,
+    };
+  }
+  function tickMissoes(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.missoes) return;
+    if (!mundo.missoes) mundo.missoes = [];
+    const boardMax = cfg.missoes.boardMax || 5;
+    // o board renova a cada fib(5)=5 ticks
+    if (mundo.tickCount % fib(5) === 0 && mundo.missoes.filter(q => !q.concluida).length < boardMax) {
+      const q = gerarMissao(mundo);
+      if (q) {
+        mundo.missoes.push(q);
+        logMundo(mundo, q.emoji + ' Nova missão no quadro: ' + q.nome + ' (' + q.recompensa + '🪙)');
+      }
+    }
+    // progresso: agentes vivos a trabalhar contribuem para as missões ativas
+    mundo.missoes.forEach(q => {
+      if (q.concluida) return;
+      const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.profissao !== 'desempregado');
+      if (vivos.length > 2) q.progresso = Math.min(q.meta, q.progresso + 1);
+      if (q.progresso >= q.meta) q.pronta = true;
+    });
+  }
+  function aceitarMissao(mundo, missaoId) {
+    if (!mundo.missoes) return { ok: false, erro: 'Sem quadro de missões' };
+    const q = mundo.missoes.find(x => x.id === missaoId);
+    if (!q) return { ok: false, erro: 'Missão não encontrada' };
+    if (q.concluida) return { ok: false, erro: 'Missão já concluída' };
+    q.aceite = true;
+    logMundo(mundo, '📜 O Criador aceitou a missão: ' + q.nome);
+    return { ok: true, missao: q };
+  }
+  function completarMissao(mundo, missaoId) {
+    const q = (mundo.missoes || []).find(x => x.id === missaoId);
+    if (!q) return { ok: false, erro: 'Missão não encontrada' };
+    if (!q.pronta) return { ok: false, erro: 'Missão em progresso (' + q.progresso + '/' + q.meta + ')' };
+    q.concluida = true;
+    const j = mundo.jogador;
+    if (j) {
+      j.necessidades.dinheiro += q.recompensa;
+      j.contribuicoes = (j.contribuicoes || 0) + 1;
+    }
+    mundo.culturaGlobal += q.dificuldade * 2;
+    if (mundo.diplomacia) mundo.diplomacia.reputacaoCriador = clamp((mundo.diplomacia.reputacaoCriador || 0) + 5, 0, 100);
+    logMundo(mundo, '✅ Missão concluída: ' + q.nome + ' (+' + q.recompensa + '🪙, +cultura)');
+    return { ok: true, recompensa: q.recompensa };
+  }
+
+  // ----- DIPLOMACIA: guerra & paz entre facções -----
+  function tickDiplomacia(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.diplomacia) return;
+    if (!mundo.diplomacia) {
+      mundo.diplomacia = { pactos: [], guerra: null, tensao: 0, reputacaoCriador: 20, processoPaz: 0 };
+    }
+    const D = mundo.diplomacia;
+    const faccoes = Object.keys(mundo.cfg.faccoes).filter(f => f !== 'independente');
+    if (faccoes.length < 2) return;
+    // tensão sobe com a desigualdade entre facções e desce com a cultura
+    const porFaccao = faccoes.map(f => {
+      const membros = mundo.agentes.filter(a => a.faccao === f && a.estado === 'vivo' && !a.isCriador);
+      return membros.reduce((sum, a) => sum + a.necessidades.dinheiro, 0);
+    });
+    const spread = porFaccao.length > 1 ? Math.max(...porFaccao) - Math.min(...porFaccao) : 0;
+    D.tensao = clamp(D.tensao + 0.8 + spread / 2000 - mundo.culturaGlobal / 4000, 0, 100);
+    // guerra rebenta quando a tensão atinge o limiar (89 ≈ fib(11))
+    if (!D.guerra && D.tensao >= (cfg.diplomacia.limiarGuerra || 89)) {
+      const [a, b] = faccoes;
+      D.guerra = { faccaoA: a, faccaoB: b, desde: mundo.tickCount, baixasA: 0, baixasB: 0 };
+      logMundo(mundo, '⚔️ GUERRA! ' + mundo.cfg.faccoes[a].nome + ' vs ' + mundo.cfg.faccoes[b].nome + ' — a tensão rebentou.');
+    }
+    if (D.guerra) {
+      // confrontos a cada fib(6)=8 ticks
+      if (mundo.tickCount % fib(6) === 0) {
+        ['faccaoA', 'faccaoB'].forEach((k, i) => {
+          const inimigo = i === 0 ? 'faccaoB' : 'faccaoA';
+          const atacantes = mundo.agentes.filter(a => a.faccao === D.guerra[k] && a.estado === 'vivo' && !a.isCriador);
+          const alvos = mundo.agentes.filter(a => a.faccao === D.guerra[inimigo] && a.estado === 'vivo' && !a.isCriador);
+          if (atacantes.length && alvos.length) {
+            const at = pick(atacantes), al = pick(alvos);
+            const dano = 8 + Math.floor(Math.random() * 10);
+            al.necessidades.saude = clamp(al.necessidades.saude - dano);
+            if (i === 0) D.guerra.baixasB += dano; else D.guerra.baixasA += dano;
+            al.memorias.unshift({ texto: 'Combati na guerra entre facções', ts: Date.now(), peso: 9 });
+          }
+        });
+      }
+      // paz: cultura alta ou mediação do Criador (reputação ≥ φ×100)
+      const podeMediar = (D.reputacaoCriador || 0) >= 61.8;
+      D.processoPaz = clamp(D.processoPaz + (mundo.culturaGlobal / 800) + (podeMediar ? 4 : 0), 0, 100);
+      if (D.processoPaz >= 100) {
+        logMundo(mundo, '🕊️ PAZ assinada entre ' + mundo.cfg.faccoes[D.guerra.faccaoA].nome + ' e ' + mundo.cfg.faccoes[D.guerra.faccaoB].nome + '.');
+        D.pactos.push({ faccaoA: D.guerra.faccaoA, faccaoB: D.guerra.faccaoB, desde: mundo.tickCount, tipo: 'paz' });
+        D.guerra = null; D.tensao = 0; D.processoPaz = 0;
+      }
+    } else if (D.tensao < 30 && Math.random() < 0.05) {
+      // tempos de paz podem gerar pactos de troca
+      const [a, b] = faccoes;
+      if (!D.pactos.some(pr => pr.tipo === 'troca' && pr.desde > mundo.tickCount - fib(7))) {
+        D.pactos.push({ faccaoA: a, faccaoB: b, desde: mundo.tickCount, tipo: 'troca' });
+        logMundo(mundo, '🤝 ' + mundo.cfg.faccoes[a].nome + ' e ' + mundo.cfg.faccoes[b].nome + ' assinaram um pacto de troca.');
+      }
+    }
+  }
+  function mediarPaz(mundo) {
+    const D = mundo.diplomacia;
+    if (!D || !D.guerra) return { ok: false, erro: 'Não há guerra para mediar' };
+    const rep = D.reputacaoCriador || 0;
+    if (rep < 30) return { ok: false, erro: 'Reputação insuficiente (mín. 30) — conclui missões' };
+    D.processoPaz = clamp(D.processoPaz + 20 + rep / 5, 0, 100);
+    logMundo(mundo, '🕊️ O Criador mediou a paz (' + Math.round(D.processoPaz) + '% do processo).');
+    return { ok: true, processo: D.processoPaz };
+  }
+
+  // ----- JUSTIÇA: tribunal de casos -----
+  function tickJustica(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.justica) return;
+    if (!mundo.tribunal) mundo.tribunal = { casos: [] };
+    // crimes nascem do stress social: guerra + agentes feridos podem ser acusados
+    if (mundo.tickCount % fib(6) === 0 && mundo.diplomacia && mundo.diplomacia.guerra && Math.random() < 0.4) {
+      const acusados = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.necessidades.saude < 60);
+      if (acusados.length) {
+        const ac = pick(acusados);
+        if (!mundo.tribunal.casos.some(c => c.acusadoId === ac.id && !c.julgado)) {
+          const crime = pick((cfg.justica && cfg.justica.crimes) || [{ id: 'rebeldia', nome: 'Rebeldia', pena: 20 }]);
+          mundo.tribunal.casos.push({
+            id: gerarId(), acusadoId: ac.id, acusado: ac.nome, crime: crime.nome,
+            pena: crime.pena, julgado: false, veredicto: null, criadoEm: mundo.tickCount,
+          });
+          logMundo(mundo, '⚖️ Acusação aberta: ' + ac.nome + ' responde por ' + crime.nome + '.');
+        }
+      }
+    }
+    // julgamento a cada fib(5)=5 ticks: jurados votam, maioria áurea absolve
+    if (mundo.tickCount % fib(5) === 0) {
+      const caso = mundo.tribunal.casos.find(c => !c.julgado);
+      if (caso) {
+        const jurados = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.id !== caso.acusadoId);
+        if (jurados.length >= 2) {
+          let inocente = 0;
+          jurados.forEach(jur => { if (Math.random() < 0.5 + (jur.tracos.empatia || 0) / 400) inocente++; });
+          const absolvido = inocente >= jurados.length * 0.618; // maioria áurea
+          caso.julgado = true;
+          caso.veredicto = absolvido ? 'absolvido' : 'culpado';
+          const ac = mundo.agentes.find(a => a.id === caso.acusadoId);
+          if (!absolvido && ac) {
+            ac.necessidades.dinheiro = Math.max(0, ac.necessidades.dinheiro - caso.pena);
+            ac.memorias.unshift({ texto: 'Fui julgado e declarado culpado', ts: Date.now(), peso: 7 });
+          }
+          logMundo(mundo, '⚖️ ' + caso.acusado + ' foi ' + (absolvido ? 'ABSOLVIDO' : 'condenado') + ' por ' + caso.crime + '.');
+        }
+      }
+    }
+  }
+
+  // ----- HISTÓRIA: arcos narrativos (sagas anime por capítulos) -----
+  function tickHistoria(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.historia) return;
+    if (!mundo.historia) mundo.historia = { arcoAtivo: null, capitulo: 0, eventos: [] };
+    const H = mundo.historia;
+    // novo arco quando não há nenhum ativo (verificação a cada fib(8)=21 ticks)
+    if (!H.arcoAtivo && mundo.tickCount % fib(8) === 0) {
+      const arcos = (cfg.historia.arcos || []);
+      if (arcos.length) {
+        const idx = H.eventos.length % arcos.length;
+        const arco = arcos[idx];
+        H.arcoAtivo = { id: arco.id, nome: arco.nome, emoji: arco.emoji, sinopse: arco.sinopse, capitulo: 1, capituloMax: arco.capitulos, progresso: 0 };
+        H.capitulo = 1;
+        logMundo(mundo, arco.emoji + ' ARCO: "' + arco.nome + '" — ' + arco.sinopse);
+      }
+    }
+    // progresso do capítulo: cultura + missões concluídas
+    if (H.arcoAtivo) {
+      H.arcoAtivo.progresso += (mundo.culturaGlobal % 10) / 20 + (mundo.missoes || []).filter(q => q.concluida).length * 0.2;
+      if (H.arcoAtivo.progresso >= 10) {
+        H.arcoAtivo.progresso = 0;
+        if (H.arcoAtivo.capitulo < H.arcoAtivo.capituloMax) {
+          H.arcoAtivo.capitulo++;
+          logMundo(mundo, H.arcoAtivo.emoji + ' ' + H.arcoAtivo.nome + ' — capítulo ' + H.arcoAtivo.capitulo + '/' + H.arcoAtivo.capituloMax + '.');
+        } else {
+          logMundo(mundo, '🌟 ARCO CONCLUÍDO: ' + H.arcoAtivo.nome + '! O mundo lembra-se desta saga.');
+          H.eventos.push({ arco: H.arcoAtivo.nome, concluidoEm: mundo.tickCount });
+          H.arcoAtivo = null;
+          mundo.culturaGlobal += 25;
+        }
+      }
+    }
+  }
+
+  // ----- KARDASHEV: sociedade do tipo 0 → III -----
+  function nivelKardashev(mundo) {
+    // energia = cultura + construções + ideias + população, comprimida por φ
+    return Math.min(3, Math.floor(
+      (mundo.culturaGlobal / 500 +
+       mundo.construcoes.length / 8 +
+       mundo.ideias.length / 6 +
+       mundo.agentes.filter(a => a.estado === 'vivo').length / 30) * 0.618
+    ));
+  }
+  function tickKardashev(mundo) {
+    const cfg = cfgRpg(mundo);
+    if (!cfg.kardashev) return;
+    if (!mundo.kardashev) mundo.kardashev = { nivel: 0, energia: 0 };
+    const novoNivel = nivelKardashev(mundo);
+    if (novoNivel > mundo.kardashev.nivel) {
+      mundo.kardashev.nivel = novoNivel;
+      const nomes = (cfg.kardashev.nomes) || ['Tipo 0', 'Tipo I', 'Tipo II', 'Tipo III'];
+      logMundo(mundo, '🌟 A sociedade evoluiu para ' + nomes[novoNivel] + ' — civilização de nível ' + novoNivel + ' na escala de Kardashev!');
+    }
+    mundo.kardashev.energia = Math.round(mundo.culturaGlobal / 500 * 100);
   }
 
   function entrarComoJogador(mundo, nome) {
@@ -932,6 +1177,12 @@
     aplicarConduta(mundo);
     tickFauna(mundo);
     tickNpcs(mundo);
+    // v9: RPG anime mundo aberto
+    tickMissoes(mundo);
+    tickDiplomacia(mundo);
+    tickJustica(mundo);
+    tickHistoria(mundo);
+    tickKardashev(mundo);
     expirarDefesas(mundo);
     // inventário do chão: itens não apanhados evaporam (mundo vivo, sem lixo acumulado)
     if (mundo.itensNoChao && mundo.itensNoChao.length && mundo.tickCount % fib(6) === 0) {
@@ -1252,6 +1503,8 @@
       chunks: mundo.chunks, chunksComprados: mundo.chunksComprados,
       fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
       npcs: mundo.npcs || null,
+      missoes: mundo.missoes || [], diplomacia: mundo.diplomacia || null,
+      tribunal: mundo.tribunal || null, historia: mundo.historia || null, kardashev: mundo.kardashev || null,
     }, null, 2);
   }
 
@@ -1278,6 +1531,12 @@
     // v8.1: NPCs de ambiente (migração: mundos antigos não os têm)
     if (dados.npcs && dados.npcs.length) mundo.npcs = dados.npcs;
     else if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
+    // v9: RPG (migração silenciosa de mundos antigos)
+    mundo.missoes = dados.missoes || [];
+    mundo.diplomacia = dados.diplomacia || null;
+    mundo.tribunal = dados.tribunal || null;
+    mundo.historia = dados.historia || null;
+    mundo.kardashev = dados.kardashev || null;
     mundo.construcoes = dados.construcoes || [];
     mundo.ideias = dados.ideias || [];
     mundo.gauntletRonda = dados.gauntletRonda || 0;
@@ -1302,6 +1561,7 @@
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,
     jogadorDefinirCarreira, dimensoesMundo,
     estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, criarNpcsInicial, custoProximoChunk, temConstrucao,
+    aceitarMissao, completarMissao, mediarPaz, nivelKardashev,
     serializar, deserializar, logMundo, clamp, pick, gerarId,
   };
 

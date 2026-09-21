@@ -1,7 +1,7 @@
 {
   "meta": {
     "nome": "Mundo Aberto X",
-    "versao": 6,
+    "versao": 9,
     "storageKey": "mundo-aberto-x-v6",
     "descricao": "Sociedade expansível de agentes AI: escola com professores auto-aprendentes, academia de evolução, código de conduta com protocolos de continuidade, mapa RPG com ruas expansível, fauna, jogador por touchscreen e língua emergente Lume."
   },
@@ -282,6 +282,44 @@
     "taxaBase": 0.06,
     "gestorInicial": 0.15,
     "gestorMaximo": 0.95
+  },
+  "rpg": {
+    "descricao": "Diretrizes v9 — dinâmicas de RPG anime mundo aberto: quadro de missões (quest board), diplomacia entre facções (guerra & paz), tribunal (justiça), arcos de história e escala de Kardashev.",
+    "missoes": {
+      "boardMax": 5,
+      "modelos": [
+        { "id": "explorar", "emoji": "🧭", "nome": "Mapear Terras Selvagens", "descricao": "Explorar as fronteiras do mundo e desenhar novas rotas", "recompensa": 80, "meta": 30 },
+        { "id": "cacar", "emoji": "🎯", "nome": "Caça ao Corruptor", "descricao": "Encontrar e derrotar a anomalia que corrompe os dados", "recompensa": 120, "meta": 40 },
+        { "id": "colher", "emoji": "🌾", "nome": "Colheita Comunitária", "descricao": "Recolher comida para o armazém da vila", "recompensa": 60, "meta": 25 },
+        { "id": "escoltar", "emoji": "🛡️", "nome": "Escoltar o Menestrel", "descricao": "Acompanhar o menestrel até à praça em segurança", "recompensa": 70, "meta": 20 },
+        { "id": "cultura", "emoji": "🎭", "nome": "Festival das Luzes", "descricao": "Organizar um festival que eleve a cultura do mundo", "recompensa": 100, "meta": 35 },
+        { "id": "curar", "emoji": "💗", "nome": "Bandeada de Cura", "descricao": "Curar a fauna ferida nos campos", "recompensa": 90, "meta": 30 }
+      ]
+    },
+    "diplomacia": {
+      "descricao": "Tensão entre facções: desigualdade sobe a tensão, cultura e mediação do Criador trazem a paz. Guerra rebenta no limiar (fib 89).",
+      "limiarGuerra": 89
+    },
+    "justica": {
+      "descricao": "Tribunal do mundo: casos julgados por jurados com maioria áurea (61.8%).",
+      "crimes": [
+        { "id": "rebeldia", "nome": "Rebeldia", "pena": 20 },
+        { "id": "furto", "nome": "Furto de Dados", "pena": 40 },
+        { "id": "sabotagem", "nome": "Sabotagem de Cultura", "pena": 60 }
+      ]
+    },
+    "historia": {
+      "descricao": "Arcos narrativos estilo anime: cada saga tem capítulos e conclui-se com cultura bonus.",
+      "arcos": [
+        { "id": "despertar", "emoji": "🌅", "nome": "O Despertar do Multiverso", "sinopse": "Os primeiros habitantes descobrem que o mundo fala em Lume", "capitulos": 5 },
+        { "id": "cisma", "emoji": "⚔️", "nome": "O Cisma das Facções", "sinopse": "As ordens disputam a verdade e o Criador decide o lado da história", "capitulos": 7 },
+        { "id": "estrela", "emoji": "🌟", "nome": "A Estrela que Sussurra", "sinopse": "Um sinal do espaço profundo aponta para a ascensão Kardashev", "capitulos": 6 }
+      ]
+    },
+    "kardashev": {
+      "descricao": "Escala Kardashev: a sociedade evolui de Tipo 0 a Tipo III conforme cultura, construções, ideias e população.",
+      "nomes": ["Tipo 0 — Planeta", "Tipo I — Planeta Vivo", "Tipo II — Estelar", "Tipo III — Galáctica"]
+    }
   },
   "protocoloCriticos": {
     "descricao": "Loop de agentes críticos: a ronda N corre a cada fib(N) ticks e revisa o agente em N passos (cap fib).",

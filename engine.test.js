@@ -442,5 +442,53 @@ teste('v8.1: NPCs de ambiente vivem tarefas próprias (sem economia, sem Lume)',
   expect(m3.npcs && m3.npcs.length > 0, 'migração v7 → v8.1 devia criar NPCs');
 });
 
+// ============ v9: RPG anime — missões, diplomacia, justiça, história, Kardashev ============
+
+teste('v9: quest board gera missões e o Criador recolhe recompensas', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  for (let i = 0; i < 40; i++) E.tick(m);
+  expect(m.missoes && m.missoes.length > 0, 'board devia ter missões');
+  expect(m.missoes.every(q => q.nome && q.meta > 0 && q.recompensa > 0), 'missão mal formada');
+  const pronta = m.missoes.find(q => q.pronta && !q.concluida);
+  expect(pronta, 'devia existir missão pronta após 40 ticks');
+  const moedasAntes = m.jogador.necessidades.dinheiro;
+  expect(E.completarMissao(m, pronta.id).ok, 'recolha falhou');
+  expect(m.jogador.necessidades.dinheiro > moedasAntes, 'recompensa não chegou');
+  expect(m.diplomacia.reputacaoCriador > 20, 'reputação devia subir');
+});
+
+teste('v9: guerra rebenta com a tensão e a mediação do Criador traz a paz', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.diplomacia = { pactos: [], guerra: null, tensao: 86, reputacaoCriador: 80, processoPaz: 0 };
+  m.agentes[0].faccao = 'mafia'; m.agentes[2].faccao = 'elite';
+  m.agentes[0].necessidades.dinheiro = 900; m.agentes[2].necessidades.dinheiro = 0;
+  for (let i = 0; i < 6 && !m.diplomacia.guerra; i++) E.tick(m);
+  expect(m.diplomacia.guerra, 'guerra devia rebentar (tensão ≥ 89)');
+  let guard = 0;
+  while (m.diplomacia.guerra && guard++ < 30) { E.mediarPaz(m); E.tick(m); }
+  expect(!m.diplomacia.guerra, 'mediação devia terminar a guerra');
+  expect(m.diplomacia.pactos.some(p => p.tipo === 'paz'), 'pacto de paz devia existir');
+});
+
+teste('v9: tribunal julga com veredicto e Kardashev sobe com o mundo', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.tribunal = { casos: [{ id: 'c1', acusadoId: m.agentes[0].id, acusado: m.agentes[0].nome, crime: 'Furto de Dados', pena: 40, julgado: false, veredicto: null, criadoEm: 0 }] };
+  let guard = 0;
+  while (!m.tribunal.casos[0].julgado && guard++ < 10) E.tick(m);
+  expect(m.tribunal.casos[0].julgado, 'caso devia ser julgado (julgamento a cada fib(5))');
+  expect(['absolvido', 'culpado'].includes(m.tribunal.casos[0].veredicto), 'veredicto inválido');
+  // Kardashev: mundo rico em cultura/construções deve subir de tipo
+  m.culturaGlobal = 3000; m.construcoes = new Array(10).fill({}); m.ideias = ['a', 'b', 'c', 'd'];
+  expect(E.nivelKardashev(m) >= 2, 'Kardashev devia subir com civilização avançada');
+  // sobrevive ao ciclo JSON
+  const dados = JSON.parse(E.serializar(m));
+  const m2 = E.criarMundo(CFG);
+  expect(E.deserializar(m2, dados), 'import v9 falhou');
+  expect(m2.diplomacia && m2.tribunal && m2.historia && m2.kardashev, 'estado v9 perdido no ciclo JSON');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);
