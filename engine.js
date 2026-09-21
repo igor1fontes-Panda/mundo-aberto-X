@@ -379,8 +379,54 @@
     const def = mundo.cfg.fauna.especies[especie] || pick(Object.values(mundo.cfg.fauna.especies));
     const d = dimensoesMundo(mundo);
     return { id: gerarId(), especie, nome: def.nome, emoji: def.emoji, cor: def.cor, velocidade: def.velocidade,
+      forma: def.forma || null, temperamento: def.temperamento || 'selvagem',
       x: 20 + Math.random() * (d.w - 40), y: 20 + Math.random() * (d.h - 40),
-      estado: 'vivo', ferido: false, energia: 80 };
+      estado: 'vivo', ferido: false, energia: 80, rumo: Math.random() * Math.PI * 2 };
+  }
+
+  // Cada espécie anda à sua maneira (v8.1): temperamentos da fauna em mundo.json
+  function decidirRumo(mundo, an) {
+    const d = dimensoesMundo(mundo);
+    const V = an.rumo;
+    switch (an.temperamento) {
+      case 'curioso': { // salta em zigue-zague; aproxima-se do jogador se houver comida à mão
+        if (Math.random() < 0.3) an.rumo = V + (Math.random() - 0.5) * 2.4;
+        break;
+      }
+      case 'esquivo': { // mantém distância do Criador
+        if (mundo.jogador) {
+          const dx = an.x - mundo.jogador.x, dy = an.y - mundo.jogador.y;
+          if (Math.hypot(dx, dy) < 70) an.rumo = Math.atan2(dy, dx);
+        }
+        if (Math.random() < 0.2) an.rumo = V + (Math.random() - 0.5) * 1.2;
+        break;
+      }
+      case 'gregário': { // segue o animal vivo mais próximo
+        const outros = mundo.fauna.filter(o => o.id !== an.id);
+        if (outros.length && Math.random() < 0.5) {
+          const perto = outros.reduce((m, o) => (Math.hypot(o.x - an.x, o.y - an.y) < Math.hypot(m.x - an.x, m.y - an.y) ? o : m), outros[0]);
+          an.rumo = Math.atan2(perto.y - an.y, perto.x - an.x);
+        }
+        break;
+      }
+      case 'protetor': { // ronda perto das zonas habitadas (centro do mapa)
+        if (Math.random() < 0.15) an.rumo = Math.atan2(d.h / 2 - an.y, d.w / 2 - an.x) + (Math.random() - 0.5) * 0.8;
+        break;
+      }
+      case 'dorminhoco': { // muito preguiçoso: quase parado, acorda de vez em quando
+        if (Math.random() > 0.05) return false;
+        an.rumo = Math.random() * Math.PI * 2;
+        break;
+      }
+      case 'paciente': // quase nunca muda de ideias
+      case 'observador':
+      case 'reservado':
+      default:
+        if (Math.random() < 0.1) an.rumo = Math.random() * Math.PI * 2;
+        break;
+    }
+    an.rumo = Math.atan2(Math.sin(an.rumo), Math.cos(an.rumo)); // normaliza
+    return true;
   }
   function tickFauna(mundo) {
     const cfg = mundo.cfg.fauna;
@@ -396,11 +442,77 @@
     }
     const d = dimensoesMundo(mundo);
     mundo.fauna.forEach(an => {
-      an.x = clamp(an.x + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.w - 5);
-      an.y = clamp(an.y + (Math.random() * 2 - 1) * an.velocidade * 2, 5, d.h - 5);
+      if (decidirRumo(mundo, an)) {
+        const fomeFator = an.energia < 30 ? 1.4 : 1; // com fome, apressa-se
+        an.x = clamp(an.x + Math.cos(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.w - 5);
+        an.y = clamp(an.y + Math.sin(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.h - 5);
+        an.energia = clamp(an.energia - 0.15, 0, 100);
+      }
       // Ferimentos acontecem; cuidadores e o hospital curam (Protocolo da Fauna)
       if (!an.ferido && Math.random() < 0.01) { an.ferido = true; logMundo(mundo, `🐾 ${an.nome} ficou ferido na natureza.`); }
       if (an.ferido && temConstrucao(mundo, 'hospital') && Math.random() < 0.3) { an.ferido = false; logMundo(mundo, `💗 O hospital curou ${an.nome}.`); }
+    });
+  }
+
+  // ---------- NPCs DE AMBIENTE (v8.1) ----------
+  // Não são agentes: sem LumeBrain, sem economia, sem Gauntlet. São figuras do
+  // pano de fundo que atravessam o mundo a fazer as suas tarefas.
+  function criarNpc(mundo, tipoKey) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return null;
+    const def = cfg.tipos[tipoKey] || pick(Object.values(cfg.tipos));
+    const pa = zonaPonto(mundo, def.pontoA), pb = zonaPonto(mundo, def.pontoB);
+    const inicio = pa || { x: 60, y: 60 };
+    return { id: gerarId(), tipo: tipoKey, nome: def.nome, emoji: def.emoji, cor: def.cor,
+      tarefa: def.tarefa, pontoA: def.pontoA, pontoB: def.pontoB,
+      x: inicio.x + (Math.random() - 0.5) * 30, y: inicio.y + (Math.random() - 0.5) * 30,
+      alvo: pb || inicio, indoParaB: true, pausa: 0 };
+  }
+  function zonaPonto(mundo, zonaId) {
+    if (!zonaId) return null;
+    for (const ch of mundo.chunks) {
+      const z = (ch.zonas || []).find(zz => zz.id === zonaId);
+      if (z) return { x: z.x + z.w / 2, y: z.y + z.h / 2 };
+    }
+    return null;
+  }
+  function criarNpcsInicial(mundo) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return [];
+    const tipos = Object.keys(cfg.tipos);
+    const npcs = [];
+    for (let i = 0; i < Math.min(tipos.length, cfg.max); i++) {
+      const n = criarNpc(mundo, tipos[i % tipos.length]);
+      if (n) npcs.push(n);
+    }
+    return npcs;
+  }
+  function tickNpcs(mundo) {
+    const cfg = mundo.cfg.npcs;
+    if (!cfg) return;
+    if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
+    // Entram novos em saltos Fibonacci (fib(7)=13) até ao máximo — como a fauna
+    if (mundo.npcs.length < cfg.max && mundo.tickCount % fib(7) === 0) {
+      const faltam = Object.keys(cfg.tipos).filter(t => !mundo.npcs.some(n => n.tipo === t));
+      const tipo = faltam.length ? faltam[0] : pick(Object.keys(cfg.tipos));
+      const novo = criarNpc(mundo, tipo);
+      if (novo) { mundo.npcs.push(novo); logMundo(mundo, `🧍 ${novo.nome} chegou ao mundo: ${novo.tarefa}.`); }
+    }
+    const pausaCfg = cfg.pausaTick || 21;
+    mundo.npcs.forEach(n => {
+      if (n.pausa > 0) { n.pausa--; return; } // parado a fazer a sua tarefa
+      const dx = n.alvo.x - n.x, dy = n.alvo.y - n.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 12) { // chegou: pausa a trabalhar e vira para trás
+        n.pausa = pausaCfg;
+        n.indoParaB = !n.indoParaB;
+        const prox = zonaPonto(mundo, n.indoParaB ? n.pontoB : n.pontoA);
+        if (prox) n.alvo = prox;
+      } else {
+        const passo = 2.2;
+        n.x = clamp(n.x + (dx / dist) * passo, 5, dimensoesMundo(mundo).w - 5);
+        n.y = clamp(n.y + (dy / dist) * passo, 5, dimensoesMundo(mundo).h - 5);
+      }
     });
   }
   function curarAnimal(mundo, animalId) {
@@ -816,9 +928,10 @@
 
     mundo.culturaGlobal += culturaGerada;
 
-    // v6: protocolos de conduta, fauna e mapa
+    // v6: protocolos de conduta, fauna, NPCs e mapa
     aplicarConduta(mundo);
     tickFauna(mundo);
+    tickNpcs(mundo);
     expirarDefesas(mundo);
     // inventário do chão: itens não apanhados evaporam (mundo vivo, sem lixo acumulado)
     if (mundo.itensNoChao && mundo.itensNoChao.length && mundo.tickCount % fib(6) === 0) {
@@ -1072,10 +1185,15 @@
     return { w: largura * colunas, h: altura * linhas };
   }
 
-  function jogadorMover(mundo, x, y) {
+  function jogadorMover(mundo, x, y, correr) {
     const j = mundo.jogador; if (!j) return;
     const d = dimensoesMundo(mundo);
-    j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5);
+    // Movimento por toque (v8.1): um passo suave em direcao ao alvo (passo duplo = correr)
+    const passo = correr ? 42 : 20;
+    const dx = x - j.x, dy = y - j.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= passo) { j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5); }
+    else { j.x = clamp(j.x + (dx / dist) * passo, 5, d.w - 5); j.y = clamp(j.y + (dy / dist) * passo, 5, d.h - 5); }
   }
 
   function jogadorExpandirMapa(mundo) {
@@ -1133,6 +1251,7 @@
       chats: mundo.chats, jogadorId: mundo.jogador ? mundo.jogador.id : null,
       chunks: mundo.chunks, chunksComprados: mundo.chunksComprados,
       fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
+      npcs: mundo.npcs || null,
     }, null, 2);
   }
 
@@ -1156,6 +1275,9 @@
     mundo.fundoComum = dados.fundoComum || 0;
     mundo.faunaMaxExtra = dados.faunaMaxExtra || 0;
     mundo.itensNoChao = dados.itensNoChao || [];
+    // v8.1: NPCs de ambiente (migração: mundos antigos não os têm)
+    if (dados.npcs && dados.npcs.length) mundo.npcs = dados.npcs;
+    else if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
     mundo.construcoes = dados.construcoes || [];
     mundo.ideias = dados.ideias || [];
     mundo.gauntletRonda = dados.gauntletRonda || 0;
@@ -1179,7 +1301,7 @@
     atacarAgente, defenderAtivado, pegarItemNoMundo, gerarItemNoMundo,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,
     jogadorDefinirCarreira, dimensoesMundo,
-    estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, custoProximoChunk, temConstrucao,
+    estudar, ensinar, evoluirSkill, aplicarConduta, criarFaunaInicial, criarNpcsInicial, custoProximoChunk, temConstrucao,
     serializar, deserializar, logMundo, clamp, pick, gerarId,
   };
 

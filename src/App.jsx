@@ -96,7 +96,6 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [toast, setToast] = useState(null);
   const [alvoFauna, setAlvoFauna] = useState(null);
-  const dirRef = useRef(null);
   const chatRef = useRef(null);
   const fileRef = useRef(null);
   const logRef = useRef(null);
@@ -177,9 +176,9 @@ export default function App() {
     mostrarToast('Entraste no mundo como Avatar do Criador 👑');
     repintar();
   };
-  const moverMapa = (x, y) => {
+  const moverMapa = (x, y, correr) => {
     if (!jogador) return;
-    E.jogadorMover(mundoRef.current, x, y);
+    E.jogadorMover(mundoRef.current, x, y, correr);
     repintar();
   };
   const comprar = (key) => {
@@ -232,20 +231,6 @@ export default function App() {
     repintar();
   };
 
-  // ----- Movimento contínuo (d-pad/touch) -----
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const d = dirRef.current;
-      if (d && mundoRef.current.jogador) {
-        const j = mundoRef.current.jogador;
-        const passo = 14;
-        const nx = j.x + (d === 'right' ? passo : d === 'left' ? -passo : (d === 'upright' ? passo * 0.7 : d === 'upleft' ? -passo * 0.7 : d === 'downright' ? passo * 0.7 : d === 'downleft' ? -passo * 0.7 : 0));
-        const ny = j.y + (d === 'down' ? passo : d === 'up' ? -passo : (d.indexOf('up') === 0 ? -passo * 0.7 : d.indexOf('down') === 0 ? passo * 0.7 : 0));
-        E.jogadorMover(mundoRef.current, nx, ny);
-      }
-    }, 90);
-    return () => clearInterval(iv);
-  }, [velIdx]);
   const interagirFauna = (acao) => {
     if (!alvoFauna) return;
     const r = E.jogadorInteragirAnimal(mundoRef.current, alvoFauna, acao);
@@ -458,23 +443,11 @@ export default function App() {
                 onMover={moverMapa} onSelecionar={setSelecionadoId} onFauna={setAlvoFauna}
               />
 
-              {/* ===== Controlos touch (Android/mobile) ===== */}
-              <div className="flex items-center justify-between gap-2 mt-2" style={{ touchAction: 'none' }}>
-                <div className="grid grid-cols-3 gap-1" style={{ width: 126 }}>
-                  {[['', '↖', '↑', '↗'], ['←', '·', '→'], ['↙', '↓', '↘']].flat().map((d, i) => {
-                    const dirs = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' };
-                    return (
-                      <button key={i}
-                        onPointerDown={() => { if (dirs[d]) dirRef.current = dirs[d]; }}
-                        onPointerUp={() => { dirRef.current = null; }}
-                        onPointerLeave={() => { dirRef.current = null; }}
-                        onPointerCancel={() => { dirRef.current = null; }}
-                        className="rounded-xl border border-slate-700 text-sm font-bold select-none"
-                        style={{ height: 38, background: '#0f172a', color: dirs[d] ? '#67e8f9' : '#334155', touchAction: 'none' }}>
-                        {d}
-                      </button>
-                    );
-                  })}
+              {/* ===== Controlos touchscreen (Android/mobile): tap no mapa para andar ===== */}
+              <div className="flex items-start justify-between gap-2 mt-2">
+                <div className="rounded-xl border border-slate-800 px-2.5 py-1.5 text-[10px] leading-snug text-slate-400 select-none" style={{ background: 'rgba(15,23,42,0.7)', maxWidth: 170 }}>
+                  👆 Toca no terreno para andar · num ser para selecionar
+                  {jogador && <> · duplo-toque no terreno corre para lá</>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 justify-end flex-1">
                   {selecionado && selecionado.id !== (jogador && jogador.id) && (
@@ -582,10 +555,30 @@ export default function App() {
                 <div className="flex flex-wrap gap-1.5">
                   {(m.fauna || []).map(an => (
                     <button key={an.id} onClick={() => setAlvoFauna(an.id)}
+                      title={(CFG.fauna.especies[an.especie] || {}).descricao || ''}
                       className="px-2 py-1 rounded-xl border text-[11px] font-semibold transition-all hover:scale-105"
                       style={{ borderColor: alvoFauna === an.id ? CORES.vida : '#1e293b', background: '#020617aa', color: an.ferido ? CORES.perigo : '#cbd5e1' }}>
                       {an.emoji} {an.nome}{an.ferido ? ' (ferido)' : ''}
+                      <span className="text-[9px] ml-1" style={{ color: '#64748b' }}>· {an.temperamento || ''}</span>
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* NPCs de ambiente (v8.1): figuras do mundo com afazeres próprios */}
+              <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+                <h3 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: CORES.ouro }}>🧍 Vida do mundo</h3>
+                <p className="text-[10px] text-slate-500 mb-2">Não são agentes — não falam Lume, não pagam impostos. Só vivem as suas tarefas.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(m.npcs || []).map(np => (
+                    <div key={np.id}
+                      title={np.tarefa}
+                      className="px-2 py-1 rounded-xl border border-slate-800 text-[11px] font-semibold select-none"
+                      style={{ background: '#020617aa', color: np.cor || '#cbd5e1' }}>
+                      {np.emoji} {np.nome}
+                      <span className="text-[9px] ml-1" style={{ color: '#64748b' }}>· {np.tarefa}</span>
+                      {np.pausa > 0 && <span className="text-[9px] ml-1" style={{ color: '#475569' }}>(ocupado)</span>}
+                    </div>
                   ))}
                 </div>
               </div>

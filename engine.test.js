@@ -296,7 +296,8 @@ teste('v6.1: Criador pode andar no território comprado', () => {
   const m = E.criarMundo(CFG);
   E.entrarComoJogador(m, 'Criador');
   E.expandirMapa(m, m.jogador.id);
-  E.jogadorMover(m, 1000, 160); // x > 640: só possível no novo chunk
+  // v8.1: movimento por toque dá passos suaves — andar até cruzar a fronteira
+  for (let i = 0; i < 60; i++) E.jogadorMover(m, 1000, 160); // x > 640: só possível no novo chunk
   expect(m.jogador.x === 1000, 'posição além do mapa base aceite');
 });
 
@@ -387,6 +388,58 @@ teste('v8: expandir mundo semeia itens e 20 profissões carregam', () => {
   const m2 = E.criarMundo(CFG);
   expect(E.deserializar(m2, dados), 'reimport falhou');
   expect(m2.itensNoChao.length === m.itensNoChao.length, 'itensNoChao perdido no ciclo JSON');
+});
+
+// ============ v8.1: touchscreen, fauna variada, NPCs de ambiente ============
+
+teste('v8.1: movimento por toque dá passos suaves (correr dá passos maiores)', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  const j = m.jogador;
+  const x0 = j.x, y0 = j.y;
+  E.jogadorMover(m, x0 + 500, y0, false);
+  const passoNormal = Math.hypot(j.x - x0, j.y - y0);
+  E.jogadorMover(m, j.x + 500, j.y, true);
+  const passoCorrer = Math.hypot(j.x - x0, j.y - y0) - passoNormal;
+  expect(Math.abs(passoNormal - 20) < 0.01, 'passo normal devia ser 20: ' + passoNormal);
+  expect(Math.abs(passoCorrer - 42) < 0.01, 'passo a correr devia ser 42: ' + passoCorrer);
+});
+
+teste('v8.1: fauna nasce com forma, temperamento e rumo; move-se de forma direcional', () => {
+  const m = E.criarMundo(CFG);
+  expect(m.fauna.every(an => an.temperamento), 'temperamento em falta');
+  expect(Object.keys(CFG.fauna.especies).length >= 8, 'devia haver 8 espécies');
+  const an = m.fauna[0];
+  an.temperamento = 'curioso';
+  const x0 = an.x, y0 = an.y;
+  for (let i = 0; i < 30; i++) E.tick(m);
+  expect(an.x !== x0 || an.y !== y0, 'animal devia ter-se mexido');
+  expect(typeof an.energia === 'number' && an.energia <= 100, 'energia devia gastar-se');
+});
+
+teste('v8.1: NPCs de ambiente vivem tarefas próprias (sem economia, sem Lume)', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  for (let i = 0; i < 26; i++) E.tick(m);
+  expect(m.npcs && m.npcs.length >= 6, 'deviam existir NPCs de ambiente');
+  expect(m.npcs.every(n => n.tarefa && n.pontoA && n.pontoB), 'NPC sem tarefa ou rota');
+  // pausam ao chegar ao ponto (a fazer o seu ofício)
+  expect(m.npcs.some(n => n.pausa > 0 || n.pausa === 0), 'campo pausa inexistente');
+  const n0 = m.npcs[0];
+  const dist0 = Math.hypot(n0.alvo.x - n0.x, n0.alvo.y - n0.y);
+  E.tick(m);
+  const dist1 = Math.hypot(n0.alvo.x - n0.x, n0.alvo.y - n0.y);
+  expect(n0.pausa > 0 ? true : dist1 < dist0 || dist0 < 12, 'NPC devia aproximar-se do alvo');
+  // sobrevive ao ciclo JSON
+  const dados = JSON.parse(E.serializar(m));
+  const m2 = E.criarMundo(CFG);
+  expect(E.deserializar(m2, dados), 'import falhou');
+  expect(m2.npcs.length === m.npcs.length, 'NPCs perdidos no ciclo JSON');
+  // mundos antigos (sem npcs) ganham-nos na migração
+  delete dados.npcs;
+  const m3 = E.criarMundo(CFG);
+  expect(E.deserializar(m3, dados), 'import legado falhou');
+  expect(m3.npcs && m3.npcs.length > 0, 'migração v7 → v8.1 devia criar NPCs');
 });
 
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);

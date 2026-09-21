@@ -193,14 +193,32 @@
     ]
   },
   "fauna": {
-    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados.",
-    "max": 14,
+    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados. Oito espécies com comportamentos distintos.",
+    "max": 20,
     "espansivel": true,
     "especies": {
-      "corredor": { "nome": "Corredor de Bits", "emoji": "🦊", "cor": "#fb923c", "velocidade": 3 },
-      "flutuante": { "nome": "Vaga-lume Sintético", "emoji": "🦋", "cor": "#fde047", "velocidade": 2 },
-      "guardiao": { "nome": "Guardião Silencioso", "emoji": "🐺", "cor": "#94a3b8", "velocidade": 2 }
+      "corredor": { "nome": "Corredor de Bits", "emoji": "🦊", "cor": "#fb923c", "velocidade": 3, "forma": "raposa", "temperamento": "esquivo", "descricao": "Foge rápido do Criador, adora campos abertos" },
+      "flutuante": { "nome": "Vaga-lume Sintético", "emoji": "🦋", "cor": "#fde047", "velocidade": 2, "forma": "borboleta", "temperamento": "dorminhoco", "descricao": "Flutua devagar, brilha ao anoitecer" },
+      "guardiao": { "nome": "Guardião Silencioso", "emoji": "🐺", "cor": "#94a3b8", "velocidade": 2, "forma": "lobo", "temperamento": "protetor", "descricao": "Ronda as zonas habitadas e afasta-se dos famintos" },
+      "pavio": { "nome": "Coelho Pávio", "emoji": "🐰", "cor": "#e2e8f0", "velocidade": 4, "forma": "coelho", "temperamento": "curioso", "descricao": "Salta em zigue-zague e segue agentes que oferecem comida" },
+      "tartaruga": { "nome": "Tartaruga de Dados", "emoji": "🐢", "cor": "#4ade80", "velocidade": 1, "forma": "tartaruga", "temperamento": "paciente", "descricao": "Nunca tem pressa; carrega memória antiga do mundo" },
+      "corvo": { "nome": "Corvo Profeta", "emoji": "🐦‍⬛", "cor": "#334155", "velocidade": 3, "forma": "ave", "temperamento": "observador", "descricao": "Anuncia tempestades do Gauntlet antes de elas chegarem" },
+      "axolote": { "nome": "Axolote Prismático", "emoji": "🦎", "cor": "#f9a8d4", "velocidade": 2, "forma": "axolote", "temperamento": "gregário", "descricao": "Vive junto à água e aproxima-se de quem está triste" },
+      "ourico": { "nome": "Ouriço Espinho-Neon", "emoji": "🦔", "cor": "#a3e635", "velocidade": 2, "forma": "ouriço", "temperamento": "reservado", "descricao": "Enrola-se em espinhos quando o Gauntlet passa" }
     }
+  },
+  "npcs": {
+    "descricao": "NPCs de ambiente: não são agentes (sem LumeBrain, sem economia, sem Gauntlet). São figuras do mundo que fazem tarefas próprias e dão vida ao pano de fundo.",
+    "max": 14,
+    "tipos": {
+      "carteiro": { "nome": "Carteiro de Bits", "emoji": "📮", "cor": "#60a5fa", "tarefa": "Entrega pacotes entre zonas", "pontoA": "vila", "pontoB": "floresta" },
+      "jardineiro": { "nome": "Jardineira do Parque", "emoji": "🌸", "cor": "#86efac", "tarefa": "Rega flores e poda árvores", "pontoA": "campos", "pontoB": "floresta" },
+      "varredor": { "nome": "Varredor de Ruas", "emoji": "🧹", "cor": "#cbd5e1", "tarefa": "Varre as ruas ao amanhecer", "pontoA": "vila", "pontoB": "campos" },
+      "menestrel": { "nome": "Menestrel Andarilho", "emoji": "🎻", "cor": "#c084fc", "tarefa": "Canta nas praças e nas ruas", "pontoA": "vila", "pontoB": "montanha" },
+      "pescador": { "nome": "Pescador Nostálgico", "emoji": "🎣", "cor": "#38bdf8", "tarefa": "Pesca nos lagos com paciência infinita", "pontoA": "campos", "pontoB": "montanha" },
+      "vendedor_ambulante": { "nome": "Vendedor Ambulante", "emoji": "🛒", "cor": "#fbbf24", "tarefa": "Empurra a barraca entre zonas e regateia com o vento", "pontoA": "vila", "pontoB": "campos" }
+    },
+    "pausaTick": 21
   },
   "gauntlet": {
     "eventos": [

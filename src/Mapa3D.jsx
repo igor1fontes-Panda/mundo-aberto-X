@@ -278,11 +278,12 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
 
     const terrainGroup = new THREE.Group();
     const agentsGroup = new THREE.Group();
+    const npcGroup = new THREE.Group();
     const faunaGroup = new THREE.Group();
     const ringsGroup = new THREE.Group();
     const envGroup = new THREE.Group(); // nuvens, estrelas, vagalumes (uma vez só)
     const itemsGroup = new THREE.Group();
-    scene.add(terrainGroup, agentsGroup, faunaGroup, ringsGroup, envGroup, itemsGroup);
+    scene.add(terrainGroup, agentsGroup, npcGroup, faunaGroup, ringsGroup, envGroup, itemsGroup);
 
     let groundMesh = null;
     let zoom = 1;
@@ -297,6 +298,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     let stars = null;
     let fireflies = null;
     const agentsMap = new Map();
+    const npcMap = new Map();
     const faunaMap = new Map();
     const itemsMap = new Map();
 
@@ -447,6 +449,52 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       return g;
     }
 
+    /* ---------- NPCs DE AMBIENTE ---------- */
+    function makeNpc(np) {
+      const cor = new THREE.Color(np.cor || '#94a3b8');
+      const g = new THREE.Group();
+      g.userData = { kind: 'npc', id: np.id, tx: np.x, tz: np.y };
+      const matRoupa = new THREE.MeshLambertMaterial({ color: cor, emissive: cor.clone().multiplyScalar(0.12) });
+      const matPele = new THREE.MeshLambertMaterial({ color: 0xd8b58f });
+
+      const body = new THREE.Mesh(new THREE.ConeGeometry(3.6, 9.5, 10), matRoupa); // manto cónico
+      body.position.y = 5.2;
+      g.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(2.9, 12, 10), matPele);
+      head.position.y = 11.4;
+      g.add(head);
+      // chapéu de aba (assinatura dos NPCs de ofício)
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 0.6, 14), matRoupa);
+      brim.position.y = 12.9;
+      g.add(brim);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.3, 2.2, 12), matRoupa);
+      top.position.y = 14.2;
+      g.add(top);
+      const eyeGeo = new THREE.SphereGeometry(0.42, 8, 8);
+      const matOlho = new THREE.MeshBasicMaterial({ color: 0x1e1b2e });
+      for (const sx of [-1.1, 1.1]) {
+        const eye = new THREE.Mesh(eyeGeo, matOlho);
+        eye.position.set(sx, 11.8, 2.55);
+        g.add(eye);
+      }
+      // fardo/cesta às costas
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.0, 2.2), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }));
+      pack.position.set(0, 6.4, -3.4);
+      g.add(pack);
+      const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(np.emoji || '🧍'), depthTest: false, transparent: true }));
+      emoji.scale.set(13, 13, 1);
+      emoji.position.y = 23;
+      emoji.renderOrder = 9;
+      g.add(emoji);
+      const nome = labelSprite(np.nome, np.cor || '#94a3b8');
+      nome.position.y = 30;
+      nome.scale.multiplyScalar(0.85); // etiqueta mais discreta que a dos agentes
+      g.add(nome);
+      g.userData.anim = { body, head, pack };
+      g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      return g;
+    }
+
     /* ---------- FAUNA FOFA ---------- */
     function makeFauna(an) {
       const cor = new THREE.Color(an.cor || '#fb923c');
@@ -478,12 +526,50 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const tail = new THREE.Mesh(new THREE.SphereGeometry(1.3, 8, 8), mat);
       tail.position.set(0, 5.2, -5.0);
       g.add(tail);
+      // variedade por forma (v8.1): cada espécie tem a sua silhueta
+      const extras = {};
+      const matAsa = new THREE.MeshLambertMaterial({ color: cor, emissive: cor.clone().multiplyScalar(0.6), transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+      if (an.forma === 'borboleta') {
+        const asaGeo = new THREE.CircleGeometry(3.4, 10);
+        const wL = new THREE.Mesh(asaGeo, matAsa); wL.position.set(-3.2, 8.0, -0.4); wL.rotation.y = 0.5;
+        const wR = new THREE.Mesh(asaGeo, matAsa); wR.position.set(3.2, 8.0, -0.4); wR.rotation.y = -0.5;
+        g.add(wL, wR); extras.wingL = wL; extras.wingR = wR;
+      } else if (an.forma === 'tartaruga') {
+        const casco = new THREE.Mesh(new THREE.SphereGeometry(4.9, 12, 9), new THREE.MeshLambertMaterial({ color: 0x2f5d3a }));
+        casco.scale.set(1, 0.55, 1.12); casco.position.y = 5.6; g.add(casco);
+      } else if (an.forma === 'ouriço') {
+        const spikes = new THREE.Group();
+        const spGeo = new THREE.ConeGeometry(0.42, 2.4, 5);
+        const spMat = new THREE.MeshLambertMaterial({ color: 0x7cf03d, emissive: 0x7cf03d, emissiveIntensity: 0.35 });
+        for (let i = 0; i < 16; i++) {
+          const sp = new THREE.Mesh(spGeo, spMat);
+          const a = (i / 16) * Math.PI * 2;
+          sp.position.set(Math.cos(a) * 3.1, 6.8, Math.sin(a) * 3.4);
+          sp.rotation.x = Math.PI / 2.4;
+          spikes.add(sp);
+        }
+        spikes.position.y = 1.4; g.add(spikes); extras.spikes = spikes;
+      } else if (an.forma === 'lobo') {
+        const focinho = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 7), mat);
+        focinho.rotation.x = Math.PI / 2; focinho.position.set(0, 7.8, 5.4); g.add(focinho);
+        earGeo.radiusTop = 0.4;
+      } else if (an.forma === 'ave') {
+        const bico = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.9, 6), new THREE.MeshLambertMaterial({ color: 0xf59e0b }));
+        bico.rotation.x = Math.PI / 2; bico.position.set(0, 8.1, 5.3); g.add(bico);
+      } else if (an.forma === 'axolote') {
+        // guelros rosa salientes
+        for (const sx of [-2.6, 2.6]) {
+          const guelra = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2.2, 6), new THREE.MeshLambertMaterial({ color: 0xf472b6 }));
+          guelra.position.set(sx, 8.6, 1.4); guelra.rotation.z = sx > 0 ? -0.9 : 0.9; g.add(guelra);
+        }
+      }
       const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(an.emoji || '🐾'), depthTest: false, transparent: true }));
       emoji.scale.set(13, 13, 1);
       emoji.position.y = 19;
       emoji.renderOrder = 9;
       g.add(emoji);
-      g.userData.anim = { head, tail, body };
+      g.userData.forma = an.forma || null;
+      g.userData.anim = { head, tail, body, ...extras };
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
     }
@@ -1005,13 +1091,14 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     let pointer = null;
+    let lastTapT = 0;
 
     function pick(clientX, clientY) {
       const rect = renderer.domElement.getBoundingClientRect();
       ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(ndc, camera);
-      const seres = raycaster.intersectObjects([...agentsGroup.children, ...faunaGroup.children], true);
+      const seres = raycaster.intersectObjects([...agentsGroup.children, ...npcGroup.children, ...faunaGroup.children], true);
       if (seres.length) {
         let obj = seres[0].object;
         while (obj && !(obj.userData && obj.userData.kind)) obj = obj.parent;
@@ -1025,7 +1112,10 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     }
 
     const onDown = (ev) => {
-      pointer = { x: ev.clientX, y: ev.clientY, tx: target.x, tz: target.y, moved: false };
+      const agora = performance.now();
+      const duplo = agora - lastTapT < 320; // duplo-toque = correr
+      lastTapT = agora;
+      pointer = { x: ev.clientX, y: ev.clientY, tx: target.x, tz: target.y, moved: false, correr: duplo };
       renderer.domElement.setPointerCapture?.(ev.pointerId);
     };
     const onMove = (ev) => {
@@ -1049,7 +1139,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (hit) {
           if (hit.kind === 'agente' || hit.kind === 'jogador') cb.onSelecionar(hit.id);
           else if (hit.kind === 'fauna') cb.onFauna(hit.id);
-          else if (hit.kind === 'terreno') cb.onMover(hit.x, hit.y);
+          else if (hit.kind === 'terreno') cb.onMover(hit.x, hit.y, pointer.correr);
         }
       }
       pointer = null;
@@ -1125,6 +1215,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         fireflies.position.y = Math.sin(t * 0.7) * 1.5;
       }
       const lampCor = COR_LAMP_OFF.clone().lerp(COR_LAMP_ON, Math.max(nightF, duskF * 0.6));
+      // (vaga-lume sintético usa nightF/duskF mais abaixo no bloco fauna)
       lamps.forEach(mt => mt.color.copy(lampCor));
       // nuvens à deriva
       const { dim: Dd } = cbRef.current;
@@ -1200,7 +1291,38 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (!vivos.has(id)) { disposeDeep(g); agentsGroup.remove(g); agentsMap.delete(id); }
       }
 
-      /* ----- fauna: hop fofo ----- */
+      /* ----- NPCs de ambiente: atravessam o mundo nas suas tarefas ----- */
+      const npcVivos = new Set();
+      (mundo.npcs || []).forEach(np => {
+        npcVivos.add(np.id);
+        let g = npcMap.get(np.id);
+        if (!g) { g = makeNpc(np); npcMap.set(np.id, g); npcGroup.add(g); }
+        const ud = g.userData;
+        ud.tx = np.x; ud.tz = np.y;
+        const dx = ud.tx - g.position.x, dz = ud.tz - g.position.z;
+        const k = Math.min(1, dt * 4);
+        g.position.x += dx * k;
+        g.position.z += dz * k;
+        const h = hashId(np.id);
+        const andando = Math.hypot(dx, dz) > 0.6;
+        const A = ud.anim;
+        if (andando) {
+          const alvoRot = Math.atan2(dx, dz);
+          let dr = alvoRot - g.rotation.y;
+          dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+          g.rotation.y += dr * Math.min(1, dt * 6);
+        }
+        // balanço de caminhada suave; em pausa, olha em volta devagar
+        A.body.rotation.z = andando ? Math.sin(t * 5 + h) * 0.06 : 0;
+        A.head.rotation.y = andando ? 0 : Math.sin(t * 0.8 + h * 0.3) * 0.5;
+        A.pack.rotation.x = andando ? Math.sin(t * 5 + h) * 0.08 : Math.sin(t * 1.2 + h) * 0.03;
+        g.position.y = andando ? Math.abs(Math.sin(t * 6 + h)) * 0.7 : 0;
+      });
+      for (const [id, g] of npcMap) {
+        if (!npcVivos.has(id)) { disposeDeep(g); npcGroup.remove(g); npcMap.delete(id); }
+      }
+
+      /* ----- fauna: hop fofo, formas por espécie ----- */
       const bichos = new Set();
       (mundo.fauna || []).forEach(an => {
         bichos.add(an.id);
@@ -1221,11 +1343,23 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           g.rotation.y += dr * Math.min(1, dt * 7);
         }
         const A = ud.anim;
-        const hop = moving ? Math.abs(Math.sin(t * 7 + h * 0.11)) * 2.2 : Math.sin(t * 2.2 + h * 0.07) * 0.35;
-        g.position.y = hop;
-        A.tail.rotation.x = Math.sin(t * 9 + h * 0.05) * 0.5; // rabinho a abanar
+        const forma = ud.forma;
+        const hop = moving ? Math.abs(Math.sin(t * 7 + h * 0.11)) * (forma === 'coelho' ? 3.4 : forma === 'borboleta' ? 2.6 : 2.2)
+                           : Math.sin(t * 2.2 + h * 0.07) * 0.35;
+        g.position.y = hop + (forma === 'borboleta' ? 6 : 0); // borboleta voa
+        A.tail.rotation.x = Math.sin(t * 9 + h * 0.05) * (forma === 'tartaruga' ? 0.12 : 0.5); // rabinho
         A.head.rotation.z = Math.sin(t * 1.6 + h * 0.09) * 0.12; // curiosidade
         A.body.scale.y = 0.82 + Math.sin(t * 3 + h * 0.07) * 0.03; // respiração
+        if (forma === 'borboleta') {
+          // asas a bater + brilho ao anoitecer (vaga-lume sintético)
+          const bate = Math.sin(t * 14 + h) * 0.8;
+          A.wingL.rotation.y = 0.5 + bate;
+          A.wingR.rotation.y = -0.5 - bate;
+          A.body.material.emissiveIntensity = 0.35 + Math.max(nightF, duskF * 0.5) * Math.abs(Math.sin(t * 2.4)) * 1.3;
+        }
+        if (forma === 'ouriço' && an.ferido) {
+          A.spikes.rotation.y = t * 0.8; // enrolado em espinhos
+        }
       });
       for (const [id, g] of faunaMap) {
         if (!bichos.has(id)) { disposeDeep(g); faunaGroup.remove(g); faunaMap.delete(id); }
