@@ -314,7 +314,20 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     );
     faunaRing.rotation.x = Math.PI / 2;
     faunaRing.visible = false;
-    ringsGroup.add(selRing, faunaRing);
+    // marcador de missão física (v9.1): coluna de luz dourada com anel no chão
+    const misRing = new THREE.Mesh(
+      new THREE.TorusGeometry(8, 1.1, 8, 36),
+      new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.85 })
+    );
+    misRing.rotation.x = Math.PI / 2;
+    misRing.visible = false;
+    const misBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.6, 2.6, 46, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
+    );
+    misBeam.position.y = 23;
+    misBeam.visible = false;
+    ringsGroup.add(misRing, misBeam);
 
     function updateFrustum() {
       const w = mount.clientWidth || 800;
@@ -994,6 +1007,85 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         terrainGroup.add(engrenagem);
         addEmoji(def.emoji, bx, 34, bz, 16);
       }
+      // tribunal: templo neoclássico com a BALANÇA DA JUSTIÇA no frontão (v9.1)
+      function buildTribunal(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#cbd5e1' });
+        const pedraEscura = new THREE.MeshLambertMaterial({ color: '#64748b' });
+        const ouroMat = new THREE.MeshLambertMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.35 });
+        // corpo do templo + escadaria frontal
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(34, 14, 22), pedra);
+        corpo.position.set(bx, 7, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        for (let esc = 0; esc < 3; esc++) {
+          const degrau = new THREE.Mesh(new THREE.BoxGeometry(30 - esc * 3, 1.2, 4), pedraEscura);
+          degrau.position.set(bx, 0.6 + esc * 1.2, bz + 13 - esc * 1.6); terrainGroup.add(degrau);
+        }
+        // colunas dóricas
+        for (let col = 0; col < 5; col++) {
+          const cx = bx - 14 + col * 7;
+          const coluna = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 16, 10), pedra);
+          coluna.position.set(cx, 8, bz + 11); coluna.castShadow = true; terrainGroup.add(coluna);
+          const capitel = new THREE.Mesh(new THREE.BoxGeometry(4, 1.2, 4), pedraEscura);
+          capitel.position.set(cx, 16.6, bz + 11); terrainGroup.add(capitel);
+        }
+        // frontão triangular
+        const frontao = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 20, 8, 3), pedra);
+        frontao.rotation.z = Math.PI / 2; frontao.scale.set(0.5, 1, 1);
+        frontao.position.set(bx, 19.5, bz + 10); frontao.castShadow = true; terrainGroup.add(frontao);
+        // === BALANÇA DA JUSTIÇA (animada no frame loop) ===
+        const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 9, 8), pedraEscura);
+        poste.position.set(bx, 24, bz + 10); terrainGroup.add(poste);
+        const travessa = new THREE.Mesh(new THREE.BoxGeometry(13, 0.7, 0.7), ouroMat);
+        travessa.position.set(bx, 28, bz + 10);
+        travessa.userData.kind = 'balanca-justica'; // oscila no frame loop
+        terrainGroup.add(travessa);
+        for (const sx of [-5.5, 5.5]) {
+          const corda = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 5), ouroMat);
+          corda.position.set(bx + sx, 26.4, bz + 10); terrainGroup.add(corda);
+          const prato = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.6, 0.8, 12), ouroMat);
+          prato.position.set(bx + sx, 24.6, bz + 10);
+          prato.userData.kind = 'prato-justica'; prato.userData.lado = Math.sign(sx);
+          terrainGroup.add(prato);
+        }
+        addEmoji(def.emoji, bx, 36, bz, 16);
+      }
+      // praça das missões: quest board físico com pergaminhos e "!" pulsante (v9.1)
+      function buildPracaMissoes(bx, bz, def) {
+        const madeira = new THREE.MeshLambertMaterial({ color: '#8a5a33' });
+        const madeiraEscura = new THREE.MeshLambertMaterial({ color: '#5f3d1e' });
+        // estrado circular de pedra
+        const estrado = new THREE.Mesh(new THREE.CylinderGeometry(13, 14, 1.4, 20), new THREE.MeshLambertMaterial({ color: '#94a3b8' }));
+        estrado.position.set(bx, 0.7, bz); terrainGroup.add(estrado);
+        // estrutura do quadro: duas pernas + tábua grande
+        for (const sx of [-6, 6]) {
+          const perna = new THREE.Mesh(new THREE.BoxGeometry(1.6, 12, 1.6), madeiraEscura);
+          perna.position.set(bx + sx, 6, bz); perna.castShadow = true; terrainGroup.add(perna);
+        }
+        const tabua = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 1.4), madeira);
+        tabua.position.set(bx, 12.5, bz); tabua.castShadow = true; terrainGroup.add(tabua);
+        const teto = new THREE.Mesh(new THREE.BoxGeometry(22, 1, 4), madeiraEscura);
+        teto.position.set(bx, 18.2, bz); terrainGroup.add(teto);
+        // pergaminhos pregados no quadro (mini-planos claros)
+        for (let pg = 0; pg < 3; pg++) {
+          const perg = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.4, 0.5), new THREE.MeshLambertMaterial({ color: '#f1e4c3' }));
+          perg.position.set(bx - 5.5 + pg * 5.5, 12.5 + (pg % 2) * 1.4, bz + 0.9);
+          perg.rotation.z = (pg - 1) * 0.09; terrainGroup.add(perg);
+        }
+        // "!" dourado que flutua e pulsa (assinatura RPG de missão disponível)
+        const exclama = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 8), new THREE.MeshLambertMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.8 }));
+        exclama.position.set(bx, 21, bz);
+        exclama.userData.kind = 'quest-exclama';
+        terrainGroup.add(exclama);
+        const ponto = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 8), new THREE.MeshLambertMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.8 }));
+        ponto.position.set(bx, 18.6, bz); terrainGroup.add(ponto);
+        // dois postes de pregaminho aos lados (avisos)
+        for (const sx of [-10, 10]) {
+          const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 9, 7), madeiraEscura);
+          poste.position.set(bx + sx, 4.5, bz + 5); terrainGroup.add(poste);
+          const perg = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3, 0.4), new THREE.MeshLambertMaterial({ color: '#e7d7ae' }));
+          perg.position.set(bx + sx, 7.5, bz + 5); terrainGroup.add(perg);
+        }
+        addEmoji(def.emoji, bx, 28, bz, 15);
+      }
       // restantes: casa com telhado (estilo geral)
       mundo.construcoes.forEach((c, i) => {
         const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
@@ -1007,6 +1099,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (c.tipo === 'biblioteca') { buildBiblioteca(bx, bz, def); return; }
         if (c.tipo === 'academia') { buildAcademia(bx, bz, def); return; }
         if (c.tipo === 'fabrica') { buildFabrica(bx, bz, def); return; }
+        if (c.tipo === 'tribunal') { buildTribunal(bx, bz, def); return; }
+        if (c.tipo === 'praca_missoes') { buildPracaMissoes(bx, bz, def); return; }
         const altura = 16 + (i % 3) * 6;
         const corBase = new THREE.Color(def.cor);
         const box = new THREE.Mesh(
@@ -1230,6 +1324,17 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           ch.scale.setScalar(1 + fase * 1.6);
         }
         else if (ud.kind === 'engrenagem-fabrica') ch.rotation.z = t * 1.2;
+        else if (ud.kind === 'balanca-justica') ch.rotation.z = Math.sin(t * 0.9) * 0.18; // oscila devagar
+        else if (ud.kind === 'prato-justica') {
+          // os pratos sobem/descem em contra-fase, presos à travessa
+          const ang = Math.sin(t * 0.9) * 0.18;
+          ch.position.y = 24.6 - Math.sin(ang) * ud.lado * 5.5;
+          ch.rotation.z = -ang * ud.lado * 0.6;
+        }
+        else if (ud.kind === 'quest-exclama') {
+          ch.position.y = 21 + Math.sin(t * 2.6) * 1.2; // flutua
+          ch.material.emissiveIntensity = 0.6 + Math.abs(Math.sin(t * 2.6)) * 0.7; // pulsa
+        }
       });
       clouds.forEach(c => {
         c.g.position.x += c.speed * dt;
@@ -1384,6 +1489,16 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const alvo = (mundo.fauna || []).find(a => a.id === cb.alvoFauna);
       if (alvo) { faunaRing.visible = true; faunaRing.position.set(alvo.x, 0.25, alvo.y); faunaRing.rotation.z = -t; }
       else faunaRing.visible = false;
+      // marcador da missão física ativa (aceite e não concluída)
+      const misAtiva = (mundo.missoes || []).find(q => q.aceite && !q.concluida && q.alvo);
+      if (misAtiva) {
+        misRing.visible = true;
+        misRing.position.set(misAtiva.alvo.x, 0.5 + Math.sin(t * 2.2) * 0.4, misAtiva.alvo.y);
+        misRing.rotation.z = t * 1.6;
+        misBeam.visible = true;
+        misBeam.position.set(misAtiva.alvo.x, 23, misAtiva.alvo.y);
+        misBeam.material.opacity = 0.2 + Math.abs(Math.sin(t * 2.2)) * 0.14;
+      } else { misRing.visible = false; misBeam.visible = false; }
 
       // câmera
       const j = cb.jogador;

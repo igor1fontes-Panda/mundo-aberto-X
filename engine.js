@@ -194,12 +194,18 @@
     if (!vivos.length) return null;
     const dono = pick(vivos);
     const dificuldadeN = Math.min(6, 1 + Math.floor(mundo.tickCount / fib(6)));
+    // local físico no terreno (v9.1): o Criador viaja até lá para impulsionar a missão
+    const d = dimensoesMundo(mundo);
+    const alvo = (t.alvo === 'ponto' || t.alvo === 'ponto_fixo')
+      ? { x: clamp(60 + Math.random() * (d.w - 120), 20, d.w - 20), y: clamp(60 + Math.random() * (d.h - 120), 20, d.h - 20) }
+      : null;
     return {
       id: gerarId(), tipo: t.id, nome: t.nome, emoji: t.emoji,
       descricao: t.descricao, dono: dono.nome, donoId: dono.id,
       dificuldade: dificuldadeN,
       recompensa: t.recompensa * dificuldadeN,
       progresso: 0, meta: t.meta * dificuldadeN,
+      alvo,
       pronta: false, concluida: false, aceite: false, criadaEm: mundo.tickCount,
     };
   }
@@ -216,11 +222,23 @@
         logMundo(mundo, q.emoji + ' Nova missão no quadro: ' + q.nome + ' (' + q.recompensa + '🪙)');
       }
     }
-    // progresso: agentes vivos a trabalhar contribuem para as missões ativas
+    // progresso: agentes vivos a trabalhar contribuem; missões físicas (alvo)
+    // só avançam com o Criador no terreno, junto do marcador
+    const j = mundo.jogador;
     mundo.missoes.forEach(q => {
       if (q.concluida) return;
       const vivos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.profissao !== 'desempregado');
-      if (vivos.length > 2) q.progresso = Math.min(q.meta, q.progresso + 1);
+      if (q.alvo) {
+        // missão física: o esforço do Criador no terreno vale 2/tick; a sociedade
+        // avança devagar por si (1 a cada 3 ticks) para o quadro não entupir
+        if (j && q.aceite && Math.hypot(j.x - q.alvo.x, j.y - q.alvo.y) < 45) {
+          q.progresso = Math.min(q.meta, q.progresso + 2);
+        } else if (vivos.length > 2 && mundo.tickCount % 3 === 0) {
+          q.progresso = Math.min(q.meta, q.progresso + 1);
+        }
+      } else if (vivos.length > 2) {
+        q.progresso = Math.min(q.meta, q.progresso + 1);
+      }
       if (q.progresso >= q.meta) q.pronta = true;
     });
   }
@@ -230,7 +248,9 @@
     if (!q) return { ok: false, erro: 'Missão não encontrada' };
     if (q.concluida) return { ok: false, erro: 'Missão já concluída' };
     q.aceite = true;
-    logMundo(mundo, '📜 O Criador aceitou a missão: ' + q.nome);
+    q.aceiteEm = mundo.tickCount;
+    if (q.alvo) logMundo(mundo, '📜 ' + q.nome + ': o Criador partiu para o terreno (' + Math.round(q.alvo.x) + ', ' + Math.round(q.alvo.y) + ').');
+    else logMundo(mundo, '📜 O Criador aceitou a missão: ' + q.nome);
     return { ok: true, missao: q };
   }
   function completarMissao(mundo, missaoId) {
@@ -335,8 +355,10 @@
         }
       }
     }
-    // julgamento a cada fib(5)=5 ticks: jurados votam, maioria áurea absolve
-    if (mundo.tickCount % fib(5) === 0) {
+    // julgamento a cada fib(5)=5 ticks (ou fib(3)=2 com Tribunal construído);
+    // jurados votam, maioria áurea absolve
+    const intervaloJulgamento = temConstrucao(mundo, 'tribunal') ? fib(3) : fib(5);
+    if (mundo.tickCount % intervaloJulgamento === 0) {
       const caso = mundo.tribunal.casos.find(c => !c.julgado);
       if (caso) {
         const jurados = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador && a.id !== caso.acusadoId);
@@ -348,7 +370,8 @@
           caso.veredicto = absolvido ? 'absolvido' : 'culpado';
           const ac = mundo.agentes.find(a => a.id === caso.acusadoId);
           if (!absolvido && ac) {
-            ac.necessidades.dinheiro = Math.max(0, ac.necessidades.dinheiro - caso.pena);
+            const penaFinal = temConstrucao(mundo, 'tribunal') ? Math.round(caso.pena / 2) : caso.pena;
+            ac.necessidades.dinheiro = Math.max(0, ac.necessidades.dinheiro - penaFinal);
             ac.memorias.unshift({ texto: 'Fui julgado e declarado culpado', ts: Date.now(), peso: 7 });
           }
           logMundo(mundo, '⚖️ ' + caso.acusado + ' foi ' + (absolvido ? 'ABSOLVIDO' : 'condenado') + ' por ' + caso.crime + '.');

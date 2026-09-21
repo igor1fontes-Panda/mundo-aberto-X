@@ -450,14 +450,15 @@ teste('v9: quest board gera missões e o Criador recolhe recompensas', () => {
   for (let i = 0; i < 40; i++) E.tick(m);
   expect(m.missoes && m.missoes.length > 0, 'board devia ter missões');
   expect(m.missoes.every(q => q.nome && q.meta > 0 && q.recompensa > 0), 'missão mal formada');
-  // determinismo: com poucos trabalhadores o progresso pode não correr — força
-  // trabalho coletivo para garantir que alguma missão fica pronta
+  // determinismo: semeia uma missão comunitária (sem alvo) e força trabalho coletivo
   m.agentes.forEach(a => { if (a.estado === 'vivo' && !a.isCriador) a.profissao = 'mercador'; });
-  for (let i = 0; i < 30; i++) E.tick(m);
-  const pronta = m.missoes.find(q => q.pronta && !q.concluida);
-  expect(pronta, 'devia existir missão pronta após progresso garantido');
+  m.missoes.push({ id: 'qT', tipo: 'colher', nome: 'Colheita de Teste', emoji: '🌾', descricao: 'x', dono: 'Aria', donoId: m.agentes[0].id,
+    dificuldade: 1, recompensa: 60, progresso: 0, meta: 10, alvo: null, pronta: false, concluida: false, aceite: false, criadaEm: 0 });
+  for (let i = 0; i < 12; i++) E.tick(m);
+  const pronta = m.missoes.find(q => q.id === 'qT');
+  expect(pronta.pronta, 'missão semeada devia ficar pronta com trabalhadores');
   const moedasAntes = m.jogador.necessidades.dinheiro;
-  expect(E.completarMissao(m, pronta.id).ok, 'recolha falhou');
+  expect(E.completarMissao(m, 'qT').ok, 'recolha falhou');
   expect(m.jogador.necessidades.dinheiro > moedasAntes, 'recompensa não chegou');
   expect(m.diplomacia.reputacaoCriador > 20, 'reputação devia subir');
 });
@@ -492,6 +493,48 @@ teste('v9: tribunal julga com veredicto e Kardashev sobe com o mundo', () => {
   const m2 = E.criarMundo(CFG);
   expect(E.deserializar(m2, dados), 'import v9 falhou');
   expect(m2.diplomacia && m2.tribunal && m2.historia && m2.kardashev, 'estado v9 perdido no ciclo JSON');
+});
+
+// ============ v9.1: missões físicas no terreno + tribunal 3D ============
+
+teste('v9.1: missão física tem alvo no terreno e progride com o Criador lá', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  // criar missão física manualmente (determinismo): modelo 'explorar' tem alvo 'ponto'
+  const q = { id: 'q1', tipo: 'explorar', nome: 'Mapear Terras Selvagens', emoji: '🧭', descricao: 'x', dono: 'Aria', donoId: m.agentes[0].id,
+    dificuldade: 1, recompensa: 80, progresso: 0, meta: 10, alvo: { x: 600, y: 60 }, pronta: false, concluida: false, aceite: false, criadaEm: 0 };
+  m.missoes = [q];
+  E.aceitarMissao(m, 'q1');
+  expect(q.aceite, 'missão devia ficar aceite');
+  // progresso base da sociedade em 8 ticks (a sociedade avança devagar: 1 a cada 3 ticks)
+  for (let i = 0; i < 8; i++) E.tick(m);
+  const base = q.progresso;
+  expect(base > 0, 'sociedade devia avançar devagar mesmo sem o Criador: ' + base);
+  // no alvo: o esforço físico do Criador dobra o ritmo (+2/tick) — viaja até chegar
+  for (let i = 0; i < 60 && Math.hypot(m.jogador.x - q.alvo.x, m.jogador.y - q.alvo.y) > 30; i++) {
+    E.jogadorMover(m, q.alvo.x, q.alvo.y, true);
+  }
+  expect(Math.hypot(m.jogador.x - q.alvo.x, m.jogador.y - q.alvo.y) <= 45, 'Criador devia chegar ao marcador');
+  for (let i = 0; i < 6; i++) E.tick(m);
+  const ganhoComCriador = q.progresso - base;
+  expect(ganhoComCriador > 6, 'no marcador devia progredir rápido (2/tick): +' + ganhoComCriador);
+});
+
+teste('v9.1: Tribunal acelera julgamentos e suaviza penas', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 9999;
+  E.construir(m, m.jogador.id, 'praca_missoes');
+  expect(m.construcoes.some(c => c.tipo === 'praca_missoes'), 'praça devia construir (custo 900)');
+  E.pesquisarIdea(m, m.jogador.id, 'blockchain');
+  expect(E.construir(m, m.jogador.id, 'tribunal').ok, 'tribunal devia construir com blockchain');
+  m.tribunal = { casos: [{ id: 'c9', acusadoId: m.agentes[0].id, acusado: m.agentes[0].nome, crime: 'Furto de Dados', pena: 40, julgado: false, veredicto: null, criadoEm: 0 }] };
+  m.diplomacia = { pactos: [], guerra: null, tensao: 10, reputacaoCriador: 20, processoPaz: 0 };
+  const t0 = m.tickCount;
+  // com Tribunal (fib(3)=2 ticks), o caso julga-se em ≤3 ticks
+  while (!m.tribunal.casos[0].julgado && m.tickCount < t0 + 4) E.tick(m);
+  expect(m.tribunal.casos[0].julgado, 'Tribunal devia julgar depressa (fib(3)): ' + (m.tickCount - t0) + ' ticks');
+  expect(['absolvido', 'culpado'].includes(m.tribunal.casos[0].veredicto), 'veredicto inválido');
 });
 
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);

@@ -247,7 +247,13 @@ export default function App() {
   };
   const aceitarMissao = (id) => {
     const r = E.aceitarMissao(mundoRef.current, id);
-    mostrarToast(r.ok ? '📜 Missão aceite' : r.erro, !r.ok);
+    if (r.ok && r.missao.alvo) {
+      // missão física: o avatar parte automaticamente para o marcador no terreno
+      const m2 = mundoRef.current;
+      m2.jogador.x = r.missao.alvo.x; m2.jogador.y = r.missao.alvo.y;
+      mostrarToast('📜 Missão aceite — o avatar partiu para o marcador ' + r.missao.emoji);
+      setVista('jogo'); // ver a viagem no mapa
+    } else mostrarToast(r.ok ? '📜 Missão aceite' : r.erro, !r.ok);
     repintar();
   };
   const concluirMissao = (id) => {
@@ -504,6 +510,37 @@ export default function App() {
                   )}
                 </div>
               </div>
+
+              {/* ===== HUD da missão ativa (v9.1): física ou de sociedade ===== */}
+              {(() => {
+                const ativa = (m.missoes || []).find(q => q.aceite && !q.concluida);
+                if (!ativa) return null;
+                return (
+                  <div className="rounded-xl border p-2.5 flex items-center gap-2.5" style={{ background: 'rgba(2,6,23,0.8)', borderColor: ativa.pronta ? CORES.vida + '66' : '#1e293b' }}>
+                    <span className="text-xl">{ativa.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-black text-slate-200 truncate">{ativa.nome} {ativa.alvo && <span style={{ color: CORES.ouro }}>📍 físico</span>}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: Math.min(100, (ativa.progresso / ativa.meta) * 100) + '%', background: ativa.pronta ? CORES.vida : CORES.acento }} />
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-500">{ativa.progresso}/{ativa.meta}</span>
+                      </div>
+                      {ativa.alvo && !ativa.pronta && jogador && (
+                        <p className="text-[9px] text-slate-500 mt-0.5">
+                          📍 Chega ao marcador dourado no mapa ({Math.round(ativa.alvo.x)}, {Math.round(ativa.alvo.y)}) · distância {Math.round(Math.hypot(jogador.x - ativa.alvo.x, jogador.y - ativa.alvo.y))}m
+                        </p>
+                      )}
+                    </div>
+                    {ativa.pronta && (
+                      <button onClick={() => concluirMissao(ativa.id)}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black" style={{ background: CORES.vida, color: '#052e16' }}>
+                        ✅ Recolher {ativa.recompensa}🪙
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ===== Controlos touchscreen (Android/mobile): tap no mapa para andar ===== */}
               <div className="flex items-start justify-between gap-2 mt-2">
