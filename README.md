@@ -19,6 +19,7 @@
 - **🍎 Professores auto-aprendentes (v6)** — ensinar acelera o professor: ao dar aulas, aprende novas skills sozinho (self-learning teacher).
 - **📜 Código de Conduta (v6)** — 6 protocolos de continuidade: Cuidado (fundo comum salva famintos), Sucessão (espíritos legam moedas e saber), Partilha (imposto sobre riqueza), Ensino, Fauna, Continuidade.
 - **🏛️ Sociedade que se constrói a si própria (v6.1)** — o fundo comum ergue as instituições sozinho (Escola primeiro!), financia ideias que desbloqueiam construções e paga bolsas a estudantes e académicos. Investe apenas com **reserva áurea** (custo × φ de folga) e fome média baixa — nunca se arruína a construir. Salários garantidos a todas as profissões (professor, académico, cuidador) e colocação imediata para graduados: **zero mortes por estagnação económica.**
+- **🧊 Mundo em 3D top-down (v7)** — mapa renderizado em Three.js (câmera ortográfica inclinada): chunks/zonas/ruas, construções em caixas 3D com emoji, habitantes e fauna animados. Arrasta para pan, roda para zoom, clica no terreno para andar, clica num ser para o selecionar — e 🎯 segue o Criador pela câmera.
 - **🗺️ Mapa RPG expansível (v6)** — ruas nomeadas e zonas em chunks; cada anexação custa fib(n)×200 e chega com novo distrito, ruas e espaço para a fauna.
 - **🐾 Fauna viva (v6)** — animais vagueiam, ferem-se, reproduzem-se em saltos fib(7) e são curados por cuidadores, hospitais ou pelo Criador.
 - **📱 Touch/gameplay (v6)** — d-pad contínuo + botões de ação (Falar, Dar, Curar, Alimentar, +Território), otimizado para Android 14 (PWA, sem zoom por duplo-toque, sem overscroll).
@@ -28,30 +29,30 @@
 ## 🚀 Correr localmente
 
 ```bash
-npm install         # instala esbuild (compilador JSX) — única devDependency
-npm test            # 28 smoke tests do engine
-npm run build:local # re-gera app.compiled.js + mundo.js (após editar app.js ou mundo.json)
-npm start           # compila e serve em http://localhost:3000
+npm install   # Vite, React, Three.js, Recharts
+npm test      # 28 smoke tests do engine
+npm run dev   # dev server em http://localhost:3000 (usa PORT para mudar)
+npm run build # produção → dist/
 ```
 
-Ou abrir `index.html` diretamente no browser.
+## ☁️ Deploy
 
-## ☁️ Deploy (Vercel)
-
-Site estático puro — `vercel.json` fixa `buildCommand: null` e serve os artefactos commitados (`app.compiled.js`, `mundo.js`) tal e qual; `serve.js` é o fallback local. A app já está ligada ao GitHub e publica em cada push.
+- **Vercel** (ligada ao GitHub, publica em cada push): framework Vite, `npm run build` → `dist/` (fixado em `vercel.json`).
+- **Freebuff hosting**: deteta o Vite e corre `npm install` + `npm run build` — pronto no botão Deploy.
 
 ## 🗂️ Estrutura
 
 ```
 mundo.json        ← configuração (fonte de verdade)
-engine.js         ← motor de simulação (Node + browser)
-app.js            ← UI React (fonte JSX)
-app.compiled.js   ← artefacto compilado (gerado — o que o browser carrega)
-mundo.js          ← artefacto gerado de mundo.json (window.WORLD)
-index.html        ← shell (React/Recharts por CDN, afixados)
-engine.test.js    ← smoke tests
-serve.js          ← servidor estático
-vercel.json       ← config do deploy (sem build)
+engine.js         ← motor de simulação (Node + browser, script global)
+src/App.jsx       ← UI React (painéis, chat, gráficos, controlos)
+src/Mapa3D.jsx    ← mapa 3D top-down (Three.js)
+src/main.jsx      ← entrada Vite
+index.html        ← shell (carrega /engine.js + módulo React)
+public/engine.js  ← cópia gerada do engine pelo script `gen`
+engine.test.js    ← smoke tests (Node puro)
+vite.config.js    ← Vite (HMR off, 0.0.0.0, allowedHosts)
+vercel.json       ← config do deploy Vercel (Vite → dist/)
 CLAUDE.md         ← guia para agentes AI
 ```
 

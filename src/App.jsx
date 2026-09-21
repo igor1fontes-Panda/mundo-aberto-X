@@ -1,18 +1,20 @@
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
+import Mapa3D from './Mapa3D.jsx';
+import CFG from '../mundo.json';
+
 /* ============================================================
-   MUNDO ABERTO X — UI v6 (React via Babel-standalone)
-   v6: mapa RPG com ruas/chunks, touch d-pad + ações, escola/academia,
-   conduta, fauna, expansão de território
-   - Jogador jogável dentro do mundo (Avatar do Criador)
-   - Mapa vivo, chat PT/EN + tokens Lume, painéis de gestão
+   MUNDO ABERTO X — UI v7 (Vite + React + Three.js)
+   v7: mapa 3D top-down, pan/zoom/seguir, flash de Gauntlet
    ============================================================ */
-const { useState, useEffect, useRef, useMemo, useCallback } = React;
-const { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } = Recharts;
 
 const E = window.Engine;
-const CFG = window.WORLD;
 const FIB8 = E.fib(8); // 21 — intervalo do Gauntlet
 
-// Migração v5 → v6: mundos antigos ganham os novos campos
+// Migração v5 → v6+: mundos antigos ganham os novos campos
 (function migrar() {
   try {
     const antigo = localStorage.getItem('mundo-aberto-x-v5');
@@ -28,18 +30,13 @@ const CORES = {
 };
 
 const Icons = {
-  User: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-  Crown: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"/><path d="M5 20h14"/></svg>,
-  Download: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-  Upload: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-  Plus: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-  Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
-  Swords: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></svg>,
-  Brain: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>,
-  ScrollText: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>,
-  Globe: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>,
-  Zap: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>,
-  X: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+  User: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+  Crown: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>,
+  Download: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>,
+  Upload: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg>,
+  Plus: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>,
+  Send: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>,
+  X: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>,
 };
 
 /* ---------- Componentes pequenos ---------- */
@@ -77,7 +74,7 @@ function StatPill({ emoji, valor, titulo }) {
 }
 
 /* ---------- App ---------- */
-function App() {
+export default function App() {
   const mundoRef = useRef(null);
   if (!mundoRef.current) {
     const m = E.criarMundo(CFG);
@@ -102,8 +99,8 @@ function App() {
   const dirRef = useRef(null);
   const chatRef = useRef(null);
   const fileRef = useRef(null);
-  const mapaRef = useRef(null);
   const logRef = useRef(null);
+  const ultimoTick = useRef(0);
 
   const mostrarToast = useCallback((msg, erro) => {
     setToast({ msg, erro: !!erro, id: Date.now() });
@@ -119,10 +116,15 @@ function App() {
       if (m.tickCount % 10 === 0) {
         try { localStorage.setItem(CFG.meta.storageKey, E.serializar(m)); } catch (e) {}
       }
+      // toast automático quando o Gauntlet dispara (fib(8)=21 ticks)
+      if (m.tickCount > 0 && m.tickCount % FIB8 === 0 && m.tickCount !== ultimoTick.current) {
+        ultimoTick.current = m.tickCount;
+        mostrarToast('⚔️ GAUNTLET! A tempestade testa a sociedade…', true);
+      }
       repintar();
     }, CFG.mundo.velocidades[velIdx]);
     return () => clearInterval(iv);
-  }, [velIdx, repintar]);
+  }, [velIdx, repintar, mostrarToast]);
 
   const m = mundoRef.current;
   const jogador = m.jogador;
@@ -176,11 +178,9 @@ function App() {
     mostrarToast('Entraste no mundo como Avatar do Criador 👑');
     repintar();
   };
-  const moverMapa = (ev) => {
-    if (!jogador || !mapaRef.current) return;
-    const r = mapaRef.current.getBoundingClientRect();
-    // O mapa é uma vista escalada do mundo: converter pixéis do ecrã para coordenadas do mundo
-    E.jogadorMover(mundoRef.current, (ev.clientX - r.left) / escalaMapa, (ev.clientY - r.top) / escalaMapa);
+  const moverMapa = (x, y) => {
+    if (!jogador) return;
+    E.jogadorMover(mundoRef.current, x, y);
     repintar();
   };
   const comprar = (key) => {
@@ -233,7 +233,7 @@ function App() {
     repintar();
   };
 
-  // ----- v6: movimento contínuo (d-pad/touch), interação com fauna, expansão -----+
+  // ----- Movimento contínuo (d-pad/touch) -----
   useEffect(() => {
     if (velIdx < 0) return;
     const iv = setInterval(() => {
@@ -281,21 +281,7 @@ function App() {
   }, [m, m.tickCount]);
 
   const chatSel = selecionado ? (m.chats[selecionado.id] || []) : [];
-
-  // ----- Escala do mapa: o mundo (com chunks comprados) cabe no painel -----
   const dim = E.dimensoesMundo(m);
-  const [escalaMapa, setEscalaMapa] = useState(1);
-  useEffect(() => {
-    const medir = () => {
-      const el = mapaRef.current;
-      if (!el) return;
-      const s = Math.min(el.clientWidth / dim.w, 340 / dim.h);
-      setEscalaMapa(s > 0 && isFinite(s) ? s : 1);
-    };
-    medir();
-    window.addEventListener('resize', medir);
-    return () => window.removeEventListener('resize', medir);
-  }, [dim.w, dim.h]);
 
   return (
     <div className="min-h-screen text-slate-200" style={{ background: `radial-gradient(1200px 600px at 70% -10%, #0b2b3a55, transparent), ${CORES.bg}` }}>
@@ -336,7 +322,7 @@ function App() {
       </header>
 
       {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-semibold shadow-2xl border"
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-sm font-semibold shadow-2xl border mu-fade"
           style={{ background: toast.erro ? '#450a0a' : '#052e16', borderColor: toast.erro ? CORES.perigo : CORES.vida, color: toast.erro ? '#fecaca' : '#bbf7d0' }}>
           {toast.msg}
         </div>
@@ -389,10 +375,10 @@ function App() {
           )}
         </section>
 
-        {/* ============ CENTRO: MAPA / ABAS ============ */}
+        {/* ============ CENTRO: MAPA 3D / ABAS ============ */}
         <section className="order-1 lg:order-2 space-y-3">
           <div className="flex gap-1.5">
-            {[['mundo', '🗺️ Mundo'], ['construir', '🏛️ Construir'], ['sociedade', '🏫 Sociedade'], ['sobre', '✨ Regras']].map(([t, l]) => (
+            {[['mundo', '🗺️ Mundo'], ['construir', '🏛️ Construir'], ['sociedade', '🏫 Sociedade'], ['regras', '✨ Regras']].map(([t, l]) => (
               <button key={t} onClick={() => setTab(t)}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
                 style={{ background: tab === t ? 'linear-gradient(135deg,#0891b2,#7c3aed)' : 'rgba(15,23,42,0.8)', color: tab === t ? '#fff' : '#94a3b8', border: '1px solid #1e293b' }}>
@@ -403,68 +389,11 @@ function App() {
 
           {tab === 'mundo' && (
             <div>
-              <div ref={mapaRef} onClick={moverMapa}
-                className="relative rounded-2xl border border-slate-800 overflow-hidden cursor-crosshair select-none"
-                style={{ height: 340, background: 'linear-gradient(180deg,#0f172a,#020617)', touchAction: 'none' }}>
-                {/* Vista escalada: todo o mundo (incl. chunks comprados) visível e clicável */}
-                <div style={{ width: dim.w, height: dim.h, transform: `scale(${escalaMapa})`, transformOrigin: 'top left', position: 'absolute' }}>
-                {(m.chunks || []).map(chunk => (
-                  <div key={chunk.id}>
-                    {(chunk.ruas || []).map((r, i) => (
-                      <div key={i} className="absolute" title={r.nome}
-                        style={{ left: r.x, top: r.y, width: r.w, height: r.h, borderRadius: 4, opacity: 0.9,
-                          background: 'repeating-linear-gradient(90deg,#1e293b 0 14px,#0f172a 14px 22px)' }}>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold" style={{ position: 'absolute', left: 6, top: -1 }}>{r.nome}</span>
-                      </div>
-                    ))}
-                    {(chunk.zonas || []).map(z => (
-                      <div key={z.id || z.nome} className="absolute rounded-xl border border-white/5 flex items-start justify-start p-1.5"
-                        style={{ left: z.x, top: z.y, width: z.w, height: z.h, background: z.cor + 'cc' }}>
-                        <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{z.nome}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {m.construcoes.map((c, i) => {
-                  const def = CFG.construcoes[c.tipo];
-                  return (
-                    <div key={c.id} className="absolute text-lg transition-transform hover:scale-125" title={def.nome + ' — ' + def.efeito}
-                      style={{ left: 20 + (i % 6) * 95, top: 8, filter: 'drop-shadow(0 0 6px ' + def.cor + ')' }}>
-                      {def.emoji}
-                    </div>
-                  );
-                })}
-                {(m.fauna || []).map(an => (
-                  <button key={an.id} onClick={(ev) => { ev.stopPropagation(); setAlvoFauna(an.id); }}
-                    className="absolute text-base leading-none transition-all duration-1000 hover:z-20"
-                    title={an.nome + (an.ferido ? ' (ferido — usa 💗 Curar)' : '')}
-                    style={{ left: an.x, top: an.y, transform: 'translate(-50%,-50%)', zIndex: 8,
-                      filter: an.ferido ? 'grayscale(0.8) drop-shadow(0 0 4px #f87171)' : `drop-shadow(0 0 3px ${an.cor})`, opacity: an.ferido ? 0.75 : 1 }}>
-                    {an.emoji}
-                  </button>
-                ))}
-                {m.agentes.map(ag => {
-                  if (ag.estado === 'morto' && !ag.isCriador) return null;
-                  const arq = CFG.arquetipos[ag.arquetipo] || CFG.arquetipos.humano;
-                  const sel = ag.id === selecionadoId;
-                  return (
-                    <button key={ag.id} onClick={(ev) => { ev.stopPropagation(); setSelecionadoId(ag.id); setAlvoFauna(null); }}
-                      className="absolute flex flex-col items-center transition-all duration-1000 hover:z-20"
-                      style={{ left: ag.x, top: ag.y, transform: 'translate(-50%,-50%)', zIndex: sel ? 20 : 10 }}>
-                      <span className="text-lg leading-none" style={{ filter: `drop-shadow(0 0 ${sel ? 8 : 3}px ${arq.cor})`, opacity: ag.estado === 'morto' ? 0.35 : 1 }}>{arq.emoji}</span>
-                      <span className="text-[9px] mt-0.5 px-1 rounded font-bold whitespace-nowrap" style={{ background: '#020617cc', color: sel ? arq.cor : '#94a3b8' }}>{ag.nome}</span>
-                    </button>
-                  );
-                })}
-                </div>{/* fim da vista escalada */}
-                {!jogador && (
-                  <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none">
-                    <span className="text-[10px] px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700 text-slate-400">
-                      👑 Entra como Criador — move-te com o d-pad, clica em habitantes e animais
-                    </span>
-                  </div>
-                )}
-              </div>
+              <Mapa3D
+                m={m} CFG={CFG} dim={dim} jogador={jogador}
+                selecionadoId={selecionadoId} alvoFauna={alvoFauna}
+                onMover={moverMapa} onSelecionar={setSelecionadoId} onFauna={setAlvoFauna}
+              />
 
               {/* ===== Controlos touch (Android/mobile) ===== */}
               <div className="flex items-center justify-between gap-2 mt-2" style={{ touchAction: 'none' }}>
@@ -543,7 +472,7 @@ function App() {
                           <span className="text-[11px] font-bold text-slate-200">{s.nome}</span>
                           <span className="ml-auto text-[9px] font-mono text-slate-500">{donos.length} dono(s) · nível {nivelMedio}</span>
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-0.5">{s.descricao} → desbloqueia <b>{CFG.profissoes[s.desbloqueia].nome}</b></p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{s.descricao} → desbloqueia <b>{(CFG.profissoes[s.desbloqueia] || {}).nome || s.desbloqueia}</b></p>
                       </div>
                     );
                   })}
@@ -560,7 +489,7 @@ function App() {
                   {CFG.conduta.codigos.map(c => (
                     <div key={c.id} className="rounded-xl border border-slate-800 p-2" style={{ background: '#020617aa' }}>
                       <div className="text-[11px] font-bold text-slate-200">{c.emoji} {c.nome}</div>
-                    <p className="text-[10px] text-slate-500 mt-0.5">{c.regra}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{c.regra}</p>
                     </div>
                   ))}
                 </div>
@@ -631,14 +560,15 @@ function App() {
             </div>
           )}
 
-          {tab === 'sobre' && (
+          {tab === 'regras' && (
             <div className="rounded-2xl border border-slate-800 p-4 space-y-3 text-xs leading-relaxed" style={{ background: CORES.painel }}>
               <h3 className="text-sm font-black" style={{ color: CORES.ouro }}>As regras do multiverso</h3>
               <p><b style={{ color: CORES.acento }}>Réguas de Fibonacci.</b> O Gauntlet ataca a cada {FIB8} ticks (fib 8), o vocabulário Lume cresce a cada {E.fib(6)} ticks (fib 6), os críticos correm em rondas com intervalo fib(N) e limites na proporção áurea 0.618. A própria moeda de nascimento é 1, 1, 2, 3, 5, 8…</p>
               <p><b style={{ color: CORES.acento }}>Lume, a língua emergente.</b> Os agentes falam entre si num idioma próprio, comprimido: 13 sementes de símbolos que crescem até 21 tokens. Cada frase é gerada por um mini-modelo de Markov que aprende bigramas — quanto mais conversam, mais coerente fica.</p>
               <p><b style={{ color: CORES.acento }}>Contigo falam como tu.</b> Em português ou inglês, à tua escolha — muda o idioma no painel do habitante. Por dentro, porém, todos pensam em Lume.</p>
               <p><b style={{ color: CORES.acento }}>LumeBrain, o menor LLM.</b> Cada habitante carrega um modelo comprimido: 4 pesos de política (sobreviver · acumular · socializar · criar), aprendizagem por reforço com passos que encolhem na espiral áurea, e um <b>traço de gestor</b> que cresce quando gerem bem o mundo — gestores altos reinvestem, ajudam e lideram.</p>
-              <p><b style={{ color: CORES.acento }}>Loop de críticos.</b> Uma assembleia invisible revisita cada habitante: a ronda N faz N passos de crítica e repete a cada fib(N) ticks. Quem corrige crises ganha experiência de gestor.</p>
+              <p><b style={{ color: CORES.acento }}>Loop de críticos.</b> Uma assembleia invisível revisita cada habitante: a ronda N faz N passos de crítica e repete a cada fib(N) ticks. Quem corrige crises ganha experiência de gestor.</p>
+              <p><b style={{ color: CORES.acento }}>Mundo em 3D.</b> Arrasta para pan, roda/botões para zoom, clica no terreno para mover o Criador, clica num ser para o selecionar — e 🎯 segue-o pela câmera.</p>
               <p className="text-slate-500">Tudo é exportável como <code className="text-cyan-400">.json</code> — o mundo inteiro numa página.</p>
             </div>
           )}
@@ -649,8 +579,8 @@ function App() {
           {!selecionado && (
             <div className="h-full flex flex-col items-center justify-center text-center py-10">
               <span className="text-4xl mb-3 opacity-40">🜂</span>
-              <p className="text-xs text-slate-500">Selecciona um habitante no mapa ou na lista</p>
-              {jogador && <p className="text-[10px] text-slate-600 mt-2">Clica no mapa para mover o teu Avatar</p>}
+              <p className="text-xs text-slate-500">Selecciona um habitante no mapa 3D ou na lista</p>
+              {jogador && <p className="text-[10px] text-slate-600 mt-2">Clica no terreno 3D para mover o teu Avatar</p>}
             </div>
           )}
           {selecionado && (() => {
@@ -694,7 +624,7 @@ function App() {
 
                 {ag.isCriador ? (
                   <p className="text-[11px] text-slate-400 border border-amber-500/30 rounded-xl p-2 bg-amber-500/5">
-                    És o Avatar do Criador. Clica no <b>mapa</b> para te moveres, compra ferramentas na coluna esquerda, constrói no separador 🏛️ e conversa com qualquer habitante.
+                    És o Avatar do Criador. Clica no <b>terreno 3D</b> para te moveres, compra ferramentas na coluna esquerda, constrói no separador 🏛️ e conversa com qualquer habitante.
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-1">
@@ -725,7 +655,7 @@ function App() {
                         const actual = ag.profissao === k;
                         return (
                           <Chip key={k} cor={actual ? CORES.ouro : '#94a3b8'} active={actual}
-                            title={(p.descricao || '') + (p.reqSkill ? ' — requer ' + CFG.skills.catalogo[p.reqSkill].nome : '')}
+                            title={(p.descricao || '') + (p.reqSkill ? ' — requer ' + (CFG.skills.catalogo[p.reqSkill] || {}).nome : '')}
                             onClick={() => definirCarreira(k)}>
                             {p.nome}{actual ? ' ✓' : ''}
                           </Chip>
@@ -798,7 +728,7 @@ function App() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[10px] text-slate-600 mt-1">Mundo Aberto X — agentes AI autónomos, língua emergente Lume, LumeBrain gestor, Gauntlet de Fibonacci. Feito com Codebuff ✦</p>
+          <p className="text-[10px] text-slate-600 mt-1">Mundo Aberto X — agentes AI autónomos em 3D, língua emergente Lume, LumeBrain gestor, Gauntlet de Fibonacci. Feito com Codebuff ✦</p>
         </div>
       </footer>
 
@@ -836,5 +766,3 @@ function App() {
     </div>
   );
 }
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);

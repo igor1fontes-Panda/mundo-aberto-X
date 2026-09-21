@@ -11,3 +11,6 @@ node_modules/
 
 # Exportações locais do mundo
 mundo-aberto-x-*.json
+
+# Build Vite
+dist/

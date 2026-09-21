@@ -1,18 +1,25 @@
 {
   "name": "mundo-aberto-x",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "private": true,
-  "description": "Sociedade expansível de agentes AI: escola/academia, professores auto-aprendentes, código de conduta, mapa RPG com ruas, fauna, touch, língua Lume.",
   "type": "commonjs",
+  "description": "Sociedade expansível de agentes AI em 3D top-down (Vite + React + Three.js): escola/academia, professores auto-aprendentes, código de conduta, mapa RPG expansível, fauna, touch, língua emergente Lume.",
   "scripts": {
-    "start": "npm run build:local && node serve.js",
-    "build:local": "esbuild app.js --loader:.js=jsx --jsx=transform --target=es2018 --outfile=app.compiled.js && node -e \"const fs=require('fs');fs.writeFileSync('mundo.js','window.WORLD='+fs.readFileSync('mundo.json','utf8')+';')\"",
-    "test": "node engine.test.js"
+    "dev": "npm run gen && vite --host 0.0.0.0 --port ${PORT:-3000} --strictPort",
+    "build": "npm run gen && vite build",
+    "gen": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('engine.js','public/engine.js');console.log('public/engine.js sincronizado com engine.js')\" && node scripts/gen-icons.js",
+    "test": "node engine.test.js",
+    "start": "npm run dev"
   },
   "dependencies": {
-    "@vercel/speed-insights": "^2.0.0"
+    "@vercel/speed-insights": "^2.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "recharts": "2.15.4",
+    "three": "0.170.0"
   },
   "devDependencies": {
-    "esbuild": "^0.24.2"
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
   }
 }

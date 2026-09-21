@@ -9,14 +9,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="color-scheme" content="dark" />
 <title>Mundo Aberto X — Sociedade de Agentes AI</title>
-<meta name="description" content="Multiverso de agentes AI autónomos: língua emergente Lume, LumeBrain (nano-LLM gestor), Gauntlet de Fibonacci e um jogador dentro do mundo." />
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTXVuZG8gQWJlcnRvIFgiLCJzaG9ydF9uYW1lIjoiTVVOLVgiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzAyMDYxNyIsInRoZW1lX2NvbG9yIjoiIzAyMDYxNyIsImljb25zIjpbeyJzcmMiOiJodHRwczovL2Nkbi1pY29ucy1wbmcuZmxhdGljb24uY29tLzUxMi8yNjU5LzI2NTkxNDYucG5nIiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3BuZyJ9XX0=" />
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/recharts@2.15.4/umd/Recharts.js" crossorigin="anonymous"></script>
-<script defer src="mundo.js"></script>
-<script defer src="engine.js"></script>
+<meta name="description" content="Multiverso de agentes AI autónomos em 3D: língua emergente Lume, LumeBrain (nano-LLM gestor), Gauntlet de Fibonacci e um jogador dentro do mundo." />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" type="image/png" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; overscroll-behavior: none; }
@@ -83,11 +79,16 @@
     }
   });
 </script>
-<script defer src="app.compiled.js"></script>
+<!-- Motor puro (Node + browser): carregado como script global antes do módulo React -->
+<script src="/engine.js"></script>
+<script type="module" src="/src/main.jsx"></script>
 <script>
-  // Vercel Speed Insights - initializes the queue for tracking
-  window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  // PWA offline (Android): registo do service worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    });
+  }
 </script>
-<script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
