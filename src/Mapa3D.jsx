@@ -665,12 +665,105 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           }
         }
       });
-      // construções: casa com telhado em vez de caixa crua
+      /* ---------- construções com arquitetura por setor ---------- */
+      const addEmoji = (emojiChar, x, y, z, tam = 18) => {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(emojiChar), depthTest: false, transparent: true }));
+        sprite.scale.set(tam, tam, 1);
+        sprite.position.set(x, y, z);
+        sprite.renderOrder = 9;
+        terrainGroup.add(sprite);
+      };
+      // mercado: barracas de feira com toldos às riscas + caixas de produits (estilo praça)
+      function buildMercado(bx, bz, def) {
+        const madeira = new THREE.MeshLambertMaterial({ color: '#8b5a2b' });
+        const toldos = [['#c0392b', '#f8fafc'], ['#7c3aed', '#f8fafc'], ['#2563eb', '#f8fafc'], ['#ea580c', '#f8fafc']];
+        const frutas = [0xef4444, 0x84cc16, 0xf97316, 0xeab308];
+        for (let s = 0; s < 4; s++) {
+          const sx = bx - 21 + (s % 2) * 42;
+          const sz = bz - 12 + Math.floor(s / 2) * 26;
+          // mesa de feira
+          const mesa = new THREE.Mesh(new THREE.BoxGeometry(16, 5, 9), madeira);
+          mesa.position.set(sx, 4.5, sz); mesa.castShadow = true; terrainGroup.add(mesa);
+          // pernas
+          for (const px of [-7, 7]) for (const pz of [-3.5, 3.5]) {
+            const perna = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 4.5, 6), madeira);
+            perna.position.set(sx + px, 2.2, sz + pz); terrainGroup.add(perna);
+          }
+          // produtos coloridos na mesa
+          for (let p = 0; p < 5; p++) {
+            const fruta = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 6), new THREE.MeshLambertMaterial({ color: frutas[(s + p) % frutas.length] }));
+            fruta.position.set(sx - 5 + p * 2.5, 8.2, sz + ((p % 2) - 0.5) * 3); terrainGroup.add(fruta);
+          }
+          // toldo às riscas (postes + faixas alternadas)
+          const [corA, corB] = toldos[s % toldos.length];
+          for (const px of [-7.5, 7.5]) for (const pz of [-4, 4]) {
+            const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 12, 6), madeira);
+            poste.position.set(sx + px, 6, sz + pz); terrainGroup.add(poste);
+          }
+          for (let st = 0; st < 6; st++) {
+            const risca = new THREE.Mesh(
+              new THREE.BoxGeometry(2.7, 0.5, 10.5),
+              new THREE.MeshLambertMaterial({ color: st % 2 ? corB : corA })
+            );
+            risca.position.set(sx - 6.75 + st * 2.7, 12.3, sz); risca.castShadow = true; terrainGroup.add(risca);
+          }
+        }
+        addEmoji(def.emoji, bx, 24, bz, 16);
+      }
+      // banco: edifício clássico polido — degraus, colunas, frontão triangular e letreiro dourado
+      function buildBanco(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#e8e2d4' });
+        const colunaMat = new THREE.MeshLambertMaterial({ color: '#f5f1e6' });
+        const ouro = new THREE.MeshPhongMaterial({ color: '#fbbf24', shininess: 90, specular: '#ffe9a8' });
+        // degraus de entrada
+        for (let d = 0; d < 2; d++) {
+          const degrau = new THREE.Mesh(new THREE.BoxGeometry(38 - d * 4, 1.6, 28 - d * 4), pedra);
+          degrau.position.set(bx, 0.8 + d * 1.6, bz); terrainGroup.add(degrau);
+        }
+        // corpo do edifício
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(32, 20, 22), pedra);
+        corpo.position.set(bx, 12, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        // colunata frontal (5 colunas)
+        for (let cIdx = 0; cIdx < 5; cIdx++) {
+          const col = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.2, 17, 12), colunaMat);
+          col.position.set(bx - 12 + cIdx * 6, 11, bz + 13); col.castShadow = true; terrainGroup.add(col);
+          const capitel = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1, 4.6), colunaMat);
+          capitel.position.set(bx - 12 + cIdx * 6, 19.8, bz + 13); terrainGroup.add(capitel);
+        }
+        // frontão triangular (prisma de 3 lados)
+        const frontao = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 33, 3, 1), pedra);
+        frontao.rotation.z = Math.PI / 2; frontao.rotation.y = 0;
+        frontao.position.set(bx, 25.5, bz); frontao.scale.set(1, 1, 0.62); frontao.castShadow = true;
+        terrainGroup.add(frontao);
+        // letreiro dourado sobre as colunas
+        const letreiro = new THREE.Mesh(new THREE.BoxGeometry(24, 2.2, 1), ouro);
+        letreiro.position.set(bx, 21.5, bz + 12.5); terrainGroup.add(letreiro);
+        // porta de vidro
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(6, 9, 0.8), new THREE.MeshPhongMaterial({ color: '#1e3a5f', shininess: 70, specular: '#6688aa' }));
+        porta.position.set(bx, 6.5, bz + 11.4); terrainGroup.add(porta);
+        addEmoji(def.emoji, bx, 34, bz, 16);
+      }
+      // hospital: bloco branco com cruz vermelha e telhado plano
+      function buildHospital(bx, bz, def) {
+        const branco = new THREE.MeshLambertMaterial({ color: '#f8fafc' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(28, 22, 24), branco);
+        corpo.position.set(bx, 11, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const cruzMat = new THREE.MeshLambertMaterial({ color: '#dc2626', emissive: '#dc2626', emissiveIntensity: 0.25 });
+        const cruzV = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 1), cruzMat);
+        cruzV.position.set(bx, 14, bz + 12.4); terrainGroup.add(cruzV);
+        const cruzH = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 1), cruzMat);
+        cruzH.position.set(bx, 14, bz + 12.4); terrainGroup.add(cruzH);
+        addEmoji(def.emoji, bx, 30, bz, 16);
+      }
+      // restantes: casa com telhado (estilo geral)
       mundo.construcoes.forEach((c, i) => {
         const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
-        const altura = 16 + (i % 3) * 6;
         const bx = 44 + (i % 8) * 68;
         const bz = 30;
+        if (c.tipo === 'mercado') { buildMercado(bx, bz, def); return; }
+        if (c.tipo === 'banco') { buildBanco(bx, bz, def); return; }
+        if (c.tipo === 'hospital') { buildHospital(bx, bz, def); return; }
+        const altura = 16 + (i % 3) * 6;
         const corBase = new THREE.Color(def.cor);
         const box = new THREE.Mesh(
           new THREE.BoxGeometry(24, altura, 24),
@@ -687,11 +780,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         telhado.position.set(bx, altura + 5, bz);
         telhado.rotation.y = Math.PI / 4;
         terrainGroup.add(telhado);
-        const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(def.emoji), depthTest: false, transparent: true }));
-        emoji.scale.set(18, 18, 1);
-        emoji.position.set(bx, altura + 16, bz);
-        emoji.renderOrder = 9;
-        terrainGroup.add(emoji);
+        addEmoji(def.emoji, bx, altura + 16, bz);
       });
       // luz direcional centrada no mundo
       dir.position.set(w / 2, 420, h / 2 - 180);
