@@ -212,7 +212,8 @@ function aplicarTraje(g, setor, prof) {
       const ombreira = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 3.4), matCouro());
       ombreira.position.set(sx, 12.0, 0); g.add(ombreira);
     }
-    // gorra com viseira polida + emblema da patrulha      const gorra = new THREE.Mesh(new THREE.CylinderGeometry(4.55, 4.75, 2.3, 14), new THREE.MeshLambertMaterial({ color: '#1e3a5f' }));
+    // gorra com viseira polida + emblema da patrulha
+    const gorra = new THREE.Mesh(new THREE.CylinderGeometry(4.55, 4.75, 2.3, 14), new THREE.MeshLambertMaterial({ color: '#1e3a5f' }));
       gorra.position.y = 22.3; g.add(gorra);
       const viseira = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.55, 3.2), new THREE.MeshPhongMaterial({ color: '#14203a', shininess: 60, specular: '#334455' }));
       viseira.position.set(0, 21.25, 4.9); g.add(viseira);
@@ -755,6 +756,158 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         cruzH.position.set(bx, 14, bz + 12.4); terrainGroup.add(cruzH);
         addEmoji(def.emoji, bx, 30, bz, 16);
       }
+      // escola: casarão acolhedor com telhado de duas águas, sino e pátio de recreio
+      function buildEscola(bx, bz, def) {
+        const parede = new THREE.MeshLambertMaterial({ color: '#f5e0c3' });
+        const tinta = new THREE.MeshLambertMaterial({ color: '#d97706' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(30, 16, 20), parede);
+        corpo.position.set(bx, 8, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        // telhado de duas águas (prisma rodado 90°)
+        const telhado = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 14.6, 30, 3), new THREE.MeshLambertMaterial({ color: '#b45309' }));
+        telhado.rotation.z = Math.PI / 2; telhado.scale.set(1, 1, 0.72);
+        telhado.position.set(bx, 19.5, bz); telhado.castShadow = true; terrainGroup.add(telhado);
+        // torre sineira
+        const torre = new THREE.Mesh(new THREE.BoxGeometry(4.6, 12, 4.6), parede);
+        torre.position.set(bx - 17, 10, bz); terrainGroup.add(torre);
+        const capTorre = new THREE.Mesh(new THREE.ConeGeometry(4, 4.6, 4), tinta);
+        capTorre.position.set(bx - 17, 18.4, bz); capTorre.rotation.y = Math.PI / 4; terrainGroup.add(capTorre);
+        const sino = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 10), new THREE.MeshLambertMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.4 }));
+        sino.position.set(bx - 17, 15.6, bz + 2.6); terrainGroup.add(sino);
+        // porta e janelas altas
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(5, 8, 0.8), new THREE.MeshLambertMaterial({ color: '#7c2d12' }));
+        porta.position.set(bx, 4, bz + 10.2); terrainGroup.add(porta);
+        for (const jx of [-8, 8]) {
+          const janela = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.4, 0.8), new THREE.MeshLambertMaterial({ color: '#7dd3fc', emissive: '#0ea5e9', emissiveIntensity: 0.18 }));
+          janela.position.set(bx + jx, 9, bz + 10.2); terrainGroup.add(janela);
+        }
+        // pátio de recreio: baloiço simples + flores
+        for (const px of [-6, 2]) {
+          const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 7, 6), tinta);
+          poste.position.set(bx + 19, 3.5, bz + 6 + px); terrainGroup.add(poste);
+        }
+        const travessa = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 8.6, 6), tinta);
+        travessa.rotation.x = Math.PI / 2; travessa.position.set(bx + 19, 7, bz + 8); terrainGroup.add(travessa);
+        for (const bx2 of [-2.4, 2.4]) {
+          const bancoPatio = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.4, 0.5), new THREE.MeshLambertMaterial({ color: '#334155' }));
+          bancoPatio.position.set(bx + 19 + bx2, 5.2, bz + 8); terrainGroup.add(bancoPatio);
+        }
+        addEmoji(def.emoji, bx, 30, bz, 16);
+      }
+      // universidade: campus monumental em H — dois pavilhões ligados por arco central
+      function buildUniversidade(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#e2d9c8' });
+        const teto = new THREE.MeshLambertMaterial({ color: '#6d28d9' });
+        // dois pavilhões
+        for (const dx of [-16, 16]) {
+          const pav = new THREE.Mesh(new THREE.BoxGeometry(14, 22, 20), pedra);
+          pav.position.set(bx + dx, 11, bz); pav.castShadow = true; terrainGroup.add(pav);
+          const telhU = new THREE.Mesh(new THREE.BoxGeometry(15.4, 1.4, 21.4), teto);
+          telhU.position.set(bx + dx, 22.6, bz); terrainGroup.add(telhU);
+        }
+        // arco central de ligação
+        const ponte = new THREE.Mesh(new THREE.BoxGeometry(18, 12, 12), pedra);
+        ponte.position.set(bx, 16, bz); ponte.castShadow = true; terrainGroup.add(ponte);
+        for (const sx of [-6, 6]) {
+          const pilar = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 12), pedra);
+          pilar.position.set(bx + sx, 13, bz); terrainGroup.add(pilar);
+        }
+        // torre do relógio no arco
+        const torreR = new THREE.Mesh(new THREE.BoxGeometry(5, 10, 5), pedra);
+        torreR.position.set(bx, 27, bz); terrainGroup.add(torreR);
+        const relogio = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.7, 14), new THREE.MeshLambertMaterial({ color: '#fde68a', emissive: '#f59e0b', emissiveIntensity: 0.35 }));
+        relogio.rotation.x = Math.PI / 2; relogio.position.set(bx, 29.6, bz + 2.7); terrainGroup.add(relogio);
+        const capR = new THREE.Mesh(new THREE.ConeGeometry(4, 5, 8), teto);
+        capR.position.set(bx, 34.6, bz); capR.castShadow = true; terrainGroup.add(capR);
+        // escadaria
+        for (let d = 0; d < 2; d++) {
+          const degrau = new THREE.Mesh(new THREE.BoxGeometry(30 - d * 5, 1.4, 10 - d * 2.4), pedra);
+          degrau.position.set(bx, 0.7 + d * 1.4, bz + 16.4 - d * 1.2); terrainGroup.add(degrau);
+        }
+        addEmoji(def.emoji, bx, 44, bz, 16);
+      }
+      // biblioteca: livraria antiga de pedra com estantes visíveis e lanternas
+      function buildBiblioteca(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#8b7355' });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#5c3a1e' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(26, 18, 22), pedra);
+        corpo.position.set(bx, 9, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        // estantes de livros salientes na fachada (lombadas coloridas)
+        const lombadas = [0xef4444, 0x3b82f6, 0x22c55e, 0xf59e0b, 0xa855f7];
+        for (let pr = 0; pr < 5; pr++) {
+          for (let est = 0; est < 4; est++) {
+            const livro = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.6, 0.9), new THREE.MeshLambertMaterial({ color: lombadas[(pr + est) % lombadas.length] }));
+            livro.position.set(bx - 8 + est * 5.3, 3.5 + pr * 3.7, bz + 11.2); terrainGroup.add(livro);
+          }
+        }
+        // janelas em arco altas (vidro emissivo)
+        for (const jx of [-7, 7]) {
+          const arco = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.8, 12, 1, false, 0, Math.PI), new THREE.MeshLambertMaterial({ color: '#fde68a', emissive: '#f59e0b', emissiveIntensity: 0.3 }));
+          arco.rotation.y = Math.PI / 2; arco.position.set(bx + jx, 12.5, bz + 11.1); terrainGroup.add(arco);
+          const vidro = new THREE.Mesh(new THREE.BoxGeometry(3.6, 6.4, 0.7), new THREE.MeshLambertMaterial({ color: '#cfe8ff', emissive: '#7dd3fc', emissiveIntensity: 0.25 }));
+          vidro.position.set(bx + jx, 9.5, bz + 11.1); terrainGroup.add(vidro);
+        }
+        // telhado de xisto
+        const telhB = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 16.6, 28, 3), new THREE.MeshLambertMaterial({ color: '#3f3f46' }));
+        telhB.rotation.z = Math.PI / 2; telhB.scale.set(1, 1, 0.66);
+        telhB.position.set(bx, 21.8, bz); telhB.castShadow = true; terrainGroup.add(telhB);
+        // duas lanternas de entrada
+        for (const lx of [-9.5, 9.5]) {
+          const lanterna = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), new THREE.MeshLambertMaterial({ color: '#fbbf24', emissive: '#fbbf24', emissiveIntensity: 0.7 }));
+          lanterna.position.set(bx + lx, 6.5, bz + 12); terrainGroup.add(lanterna);
+        }
+        addEmoji(def.emoji, bx, 32, bz, 16);
+      }
+      // academia: torres de investigação roxas com anéis de energia em rotação
+      function buildAcademia(bx, bz, def) {
+        const torreMat = new THREE.MeshLambertMaterial({ color: '#4c1d95' });
+        const vidroMat = new THREE.MeshPhongMaterial({ color: '#a78bfa', shininess: 80, specular: '#ddd6fe', emissive: '#7c3aed', emissiveIntensity: 0.3 });
+        for (let t = 0; t < 3; t++) {
+          const tx = bx - 13 + t * 13;
+          const altT = 20 + (t % 2) * 7;
+          const torre = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4.4, altT, 8), torreMat);
+          torre.position.set(tx, altT / 2, bz); torre.castShadow = true; terrainGroup.add(torre);
+          const cupula = new THREE.Mesh(new THREE.SphereGeometry(3.6, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), vidroMat);
+          cupula.position.set(tx, altT, bz); terrainGroup.add(cupula);
+          // anel de energia em volta da torre (roda no frame loop)
+          const anel = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.55, 8, 26), vidroMat);
+          anel.rotation.x = Math.PI / 2;
+          anel.position.set(tx, 6 + t * 4, bz);
+          anel.userData.kind = 'anel-academia';
+          terrainGroup.add(anel);
+        }
+        addEmoji(def.emoji, bx, 36, bz, 16);
+      }
+      // fábrica: galpão industrial com chaminé a fumegar e roda de engrenagem
+      function buildFabrica(bx, bz, def) {
+        const zinco = new THREE.MeshLambertMaterial({ color: '#946b3d' });
+        const tijolo = new THREE.MeshLambertMaterial({ color: '#8c3d2e' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(30, 14, 20), zinco);
+        corpo.position.set(bx, 7, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        // dente de serra no telhado (skylights industriais)
+        for (let s = 0; s < 3; s++) {
+          const dente = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 6.4, 12, 3), new THREE.MeshLambertMaterial({ color: '#7c5230' }));
+          dente.rotation.z = Math.PI / 2; dente.scale.set(1, 1, 0.5);
+          dente.position.set(bx - 10 + s * 10, 15.6, bz - 2); dente.castShadow = true; terrainGroup.add(dente);
+        }
+        // chaminé alta com faixa vermelha
+        const chamine = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.6, 26, 10), tijolo);
+        chamine.position.set(bx + 17, 13, bz - 6); chamine.castShadow = true; terrainGroup.add(chamine);
+        const faixa = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.05, 3, 10), new THREE.MeshLambertMaterial({ color: '#dc2626' }));
+        faixa.position.set(bx + 17, 23, bz - 6); terrainGroup.add(faixa);
+        // fumo (esferas translúcidas — animadas no frame loop)
+        for (let f = 0; f < 4; f++) {
+          const fumo = new THREE.Mesh(new THREE.SphereGeometry(1.7 + f * 0.35, 8, 6), new THREE.MeshLambertMaterial({ color: '#cbd5e1', transparent: true, opacity: 0.4 - f * 0.07 }));
+          fumo.position.set(bx + 17, 27 + f * 2.6, bz - 6);
+          fumo.userData.kind = 'fumo-fabrica'; fumo.userData.fase = f;
+          terrainGroup.add(fumo);
+        }
+        // engrenagem decorativa na fachada
+        const engrenagem = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.8, 8, 16), new THREE.MeshLambertMaterial({ color: '#334155' }));
+        engrenagem.position.set(bx, 6, bz + 10.2);
+        engrenagem.userData.kind = 'engrenagem-fabrica';
+        terrainGroup.add(engrenagem);
+        addEmoji(def.emoji, bx, 34, bz, 16);
+      }
       // restantes: casa com telhado (estilo geral)
       mundo.construcoes.forEach((c, i) => {
         const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
@@ -763,6 +916,11 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (c.tipo === 'mercado') { buildMercado(bx, bz, def); return; }
         if (c.tipo === 'banco') { buildBanco(bx, bz, def); return; }
         if (c.tipo === 'hospital') { buildHospital(bx, bz, def); return; }
+        if (c.tipo === 'escola') { buildEscola(bx, bz, def); return; }
+        if (c.tipo === 'universidade') { buildUniversidade(bx, bz, def); return; }
+        if (c.tipo === 'biblioteca') { buildBiblioteca(bx, bz, def); return; }
+        if (c.tipo === 'academia') { buildAcademia(bx, bz, def); return; }
+        if (c.tipo === 'fabrica') { buildFabrica(bx, bz, def); return; }
         const altura = 16 + (i % 3) * 6;
         const corBase = new THREE.Color(def.cor);
         const box = new THREE.Mesh(
@@ -970,6 +1128,18 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       lamps.forEach(mt => mt.color.copy(lampCor));
       // nuvens à deriva
       const { dim: Dd } = cbRef.current;
+      // vida nas construções: anéis da academia giram, fumo da fábrica sobe, engrenagem roda
+      terrainGroup.children.forEach(ch => {
+        const ud = ch.userData || {};
+        if (ud.kind === 'anel-academia') ch.rotation.z = t * 0.8 + ch.position.y;
+        else if (ud.kind === 'fumo-fabrica') {
+          const fase = (t * 0.35 + ud.fase * 0.25) % 1; // 0..1 ciclo de subida
+          ch.position.y = 27 + fase * 8;
+          ch.material.opacity = 0.4 * (1 - fase);
+          ch.scale.setScalar(1 + fase * 1.6);
+        }
+        else if (ud.kind === 'engrenagem-fabrica') ch.rotation.z = t * 1.2;
+      });
       clouds.forEach(c => {
         c.g.position.x += c.speed * dt;
         if (c.g.position.x > Dd.w + 240) c.g.position.x = -240;
