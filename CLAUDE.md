@@ -14,6 +14,7 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 | `engine.js` | Motor puro (sem React/DOM). Fibonacci, língua Lume, LumeBrain, loop de críticos, Gauntlet, jogador, serialização. Expõe `window.Engine` no browser e `module.exports` em Node. O script `gen` copia-o para `public/engine.js`. |
 | `src/App.jsx` | UI React (JSX transformado pelo Vite). Duas interfaces: 🎮 Jogo (mapa 3D + ações + minimapa) e 📊 Dashboard (missões, diplomacia, justiça, história, Kardashev, gráficos). |
 | `src/Minimapa.jsx` | Minimapa 2D (canvas) do mundo inteiro: zonas, construções, seres, Criador; clique navega no 3D. |
+| `src/audio.js` | **Áudio 100% procedural (v10.3)**: trilha por tema (jogo/dashboard/Gauntlet/WestDocks), ambiência contínua (mar+vento), gaivotas/pássaros por régua fib, SFX reativos e vozes PT/EN (SpeechSynthesis). Só UI — o engine continua livre de DOM. |
 | `src/main.jsx` | Entrada Vite: monta o App e injeta o Vercel Speed Insights. |
 | `index.html` | Shell Vite. Carrega `/engine.js` (global) antes do módulo React. Tem painel de erro de boot — se algo falhar, o erro aparece no ecrã em vez de loading eterno. |
 | `public/engine.js` | **Cópia gerada** do `engine.js` pelo script `gen` (corre em `dev` e `build`) — é isto que o browser carrega. |

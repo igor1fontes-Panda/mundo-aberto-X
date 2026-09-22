@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import Mapa3D from './Mapa3D.jsx';
 import Minimapa from './Minimapa.jsx';
+import audio from './audio.js';
 import CFG from '../mundo.json';
 
 /* ============================================================
@@ -106,6 +107,17 @@ export default function App() {
   const mostrarToast = useCallback((msg, erro) => {
     setToast({ msg, erro: !!erro, id: Date.now() });
     setTimeout(() => setToast(null), 2600);
+    // v10.3: áudio reativo — SFX escolhido pelo conteúdo; vozes em falas citadas
+    if (erro) audio.sfx('erro');
+    else if (/GAUNTLET/i.test(msg)) audio.sfx('gauntlet');
+    else if (/🪙|\+\d+\.\d|\+\d+🪙/.test(msg)) audio.sfx('moeda');
+    else if (/curado|alimentado/i.test(msg)) audio.sfx('curar');
+    else if (/anexado|constru|erguid|Praça|Tribunal/i.test(msg)) audio.sfx('construir');
+    else if (/⛵|Atracaste|Embarcaste|Maré/.test(msg)) audio.sfx('ondas');
+    else if (/🎣|pescaste|Pescaste/i.test(msg)) audio.sfx('pesca');
+    else if (/✅|Missão aceite|aceite/i.test(msg)) audio.sfx('sucesso');
+    else audio.sfx('clique');
+    if (/[:“]/.test(msg) && !erro) audio.voz(msg); // falas de NPCs e do capitão ganham voz
   }, []);
 
   // ----- Game loop — o mundo corre sempre; desinstalar a app é a única pausa -----
@@ -121,6 +133,8 @@ export default function App() {
         ultimoTick.current = m.tickCount;
         mostrarToast('⚔️ GAUNTLET! A tempestade testa a sociedade…', true);
       }
+      // v10.3: ambiência por tick (pássaros, gaivotas da frota) — régua Fibonacci
+      audio.tick(m, { gauntlet: m.tickCount > 0 && m.tickCount % FIB8 === 0 });
       repintar();
     }, CFG.mundo.velocidades[velIdx]);
     return () => clearInterval(iv);
@@ -134,6 +148,22 @@ export default function App() {
   );
 
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = 0; }, [m.tickCount]);
+
+  // ----- v10.3: ÁUDIO — arranca no primeiro gesto do utilizador (política dos browsers) -----
+  useEffect(() => {
+    const destravar = () => { if (!audio.iniciado) audio.iniciar(CFG.audio); };
+    window.addEventListener('pointerdown', destravar, { once: true });
+    window.addEventListener('keydown', destravar, { once: true });
+    return () => { window.removeEventListener('pointerdown', destravar); window.removeEventListener('keydown', destravar); };
+  }, []);
+  // tema da trilha muda com a interface (jogo ↔ dashboard) e com o reino anexado
+  useEffect(() => {
+    const m2 = mundoRef.current;
+    audio.setTema(vista === 'dashboard' ? 'dashboard' : (m2.westdocks && m2.westdocks.anexado ? 'westdocks' : 'jogo'));
+  }, [vista]);
+  const [trilhaOn, setTrilhaOn] = useState(true);
+  const [somOn, setSomOn] = useState(true);
+  const [vozOn, setVozOn] = useState(true);
 
   // ----- Export / Import -----
   const exportar = () => {
@@ -173,6 +203,7 @@ export default function App() {
 
   // ----- Ações do jogador -----
   const entrarComoCriador = () => {
+    audio.iniciar(CFG.audio); // v10.3: gesto do utilizador destrava o áudio
     const j = E.entrarComoJogador(mundoRef.current, 'Criador');
     setSelecionadoId(j.id);
     mostrarToast('Entraste no mundo como Avatar do Criador 👑');
@@ -222,8 +253,11 @@ export default function App() {
   };
   const enviarMsg = () => {
     if (!chatInput.trim() || !selecionado) return;
-    E.enviarChat(mundoRef.current, selecionado.id, chatInput.trim());
+    const r = E.enviarChat(mundoRef.current, selecionado.id, chatInput.trim());
     setChatInput('');
+    // v10.3: o habitante responde em voz (PT/EN — nunca Lume, que fica só nos tokens)
+    if (r && r.texto) audio.voz(r.texto, selecionado.idioma || 'pt');
+    audio.sfx('chat');
     repintar();
   };
   const mudarIdioma = (lang) => {
@@ -428,6 +462,16 @@ export default function App() {
               </button>
             )}
             <button onClick={exportar} title="Exportar mundo .json" className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800"><Icons.Download className="w-4 h-4" /></button>
+            {/* v10.3: trilha sonora, sons e vozes — três interruptores */}
+            <button onClick={() => setTrilhaOn(audio.setTrilha(!trilhaOn))} title="Trilha sonora procedural"
+              className="p-1.5 rounded-lg border text-xs transition-colors"
+              style={{ borderColor: trilhaOn ? CORES.ouro : '#1e293b', color: trilhaOn ? CORES.ouro : '#64748b', background: trilhaOn ? '#fbbf2414' : 'transparent' }}>🎵</button>
+            <button onClick={() => setSomOn(audio.setSom(!somOn))} title="Sons do mundo: mar, vento, pássaros, efeitos"
+              className="p-1.5 rounded-lg border text-xs transition-colors"
+              style={{ borderColor: somOn ? CORES.vida : '#1e293b', color: somOn ? CORES.vida : '#64748b', background: somOn ? '#34d39914' : 'transparent' }}>🔊</button>
+            <button onClick={() => setVozOn(audio.setVoz(!vozOn))} title="Vozes dos habitantes (PT/EN)"
+              className="p-1.5 rounded-lg border text-xs transition-colors"
+              style={{ borderColor: vozOn ? CORES.acento : '#1e293b', color: vozOn ? CORES.acento : '#64748b', background: vozOn ? '#22d3ee14' : 'transparent' }}>🗣️</button>
             <button onClick={() => fileRef.current && fileRef.current.click()} title="Importar mundo .json" className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800"><Icons.Upload className="w-4 h-4" /></button>
             <button onClick={novoMundo} title="Novo mundo" className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs">✦</button>
             <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={importar} />
