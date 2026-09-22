@@ -715,5 +715,85 @@ teste('v10: loja dá desconto, farol aumenta rendimento da pesca, serialização
   expect(m3.westdocks === null && m3.barcos.length === 0, 'migração v9.2 → v10 devia ficar sem WestDocks');
 });
 
+teste('v10.1: travessia completa do ferri chega ao atracadouro e volta ao cais', () => {
+  const m = E.criarMundo(CFG);
+  const j = E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  const wd = m.westdocks;
+  const ponte = { x: wd.ponte.x + wd.ponte.comprimento, y: wd.ponte.y };
+  const ferri = m.barcos.find(b => b.tipo === 'ferri');
+  ferri.x = wd.cais.x; ferri.y = wd.cais.y + 18; ferri.espera = 0;
+  // ida: do cais até à cabeceira da ponte
+  j.x = wd.cais.x; j.y = wd.cais.y;
+  expect(E.jogadorNavegar(m).ok, 'embarque no cais');
+  let t = 0;
+  while (ferri.passageiro === j.id && t++ < 140) E.tick(m);
+  expect(ferri.passageiro !== j.id, 'devia desembarcar na ida (140 ticks)');
+  expect(Math.hypot(j.x - ponte.x, j.y - ponte.y) < 30, 'devia estar na cabeceira da ponte (d=' + Math.hypot(j.x - ponte.x, j.y - ponte.y).toFixed(0) + ')');
+  // volta: da ponte até ao cais
+  expect(E.jogadorNavegar(m).ok, 'embarque na ponte');
+  t = 0;
+  while (ferri.passageiro === j.id && t++ < 140) E.tick(m);
+  expect(Math.hypot(j.x - wd.cais.x, j.y - wd.cais.y) < 30, 'devia voltar ao cais (d=' + Math.hypot(j.x - wd.cais.x, j.y - wd.cais.y).toFixed(0) + ')');
+});
+
+teste('v10.1: polícia de WestDocks afasta piratas (rendição com caserna/polícia)', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  for (let i = 0; i < 60; i++) E.tick(m); // polícia chega em fib(7)
+  expect(m.npcs.some(n => n.tipo === 'policia'), 'polícia devia existir');
+  // pirata forçado junto da presa, com a guarda em terra (caserna presente na ilha)
+  const presa = m.barcos.find(b => b.tipo !== 'pirata');
+  const pirata = { ...presa, id: E.gerarId(), tipo: 'pirata', nome: 'Teste Negro', viva: true, rendicao: 0, carga: 0, espera: 0, destino: null, passageiro: null };
+  pirata.x = presa.x + 10; pirata.y = presa.y + 5;
+  m.barcos.push(pirata);
+  let rendiu = false;
+  for (let i = 0; i < 120 && !rendiu; i++) {
+    E.tick(m);
+    rendiu = !m.barcos.includes(pirata);
+  }
+  expect(rendiu, 'pirata devia render-se à guarda (caserna + polícia no mar)');
+  expect(m.barcos.some(b => b.tipo !== 'pirata'), 'presa devia sobreviver ao abordamento');
+});
+
+teste('v10.2: capitão fala no embarque e pescaria a bordo paga com cooldown fib(4)', () => {
+  const m = E.criarMundo(CFG);
+  const j = E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  const wd = m.westdocks;
+  const ferri = m.barcos.find(b => b.tipo === 'ferri');
+  ferri.x = wd.cais.x; ferri.y = wd.cais.y + 18; ferri.espera = 0;
+  j.x = wd.cais.x; j.y = wd.cais.y;
+  // fala do capitão no embarque (PT; EN quando o Criador fala EN)
+  const rb = E.jogadorNavegar(m);
+  expect(rb.ok && rb.msg.includes('A bordo'), 'embarque devia ter msg');
+  expect(/[a-zà-ú]/i.test(rb.msg), 'capitão devia falar no embarque: ' + rb.msg);
+  expect(!/[⟨⟩|]/.test(rb.msg), 'capitão nunca fala Lume');
+  m.jogador.idioma = 'en';
+  let rbEn = E.jogadorNavegar(m); // ainda a bordo → desembarca por toggle
+  if (rbEn.msg && rbEn.msg.includes('Desembarcaste')) rbEn = E.jogadorNavegar(m); // volta a embarcar com o capitão em EN
+  expect(!rbEn.ok || /(Welcome|sailing|lighthouse|Hold|ship)/.test(rbEn.msg), 'capitão devia ter falas EN: ' + rbEn.msg);
+  m.jogador.idioma = 'pt';
+  // pescaria a bordo: paga, com cooldown fib(4)=3
+  const carteira0 = j.necessidades.dinheiro;
+  const r1 = E.jogadorPescarNoFerri(m);
+  expect(r1.ok, 'pescaria a bordo devia funcionar: ' + (r1.erro || ''));
+  expect(j.necessidades.dinheiro > carteira0, 'pescado devia pagar');
+  expect(!E.jogadorPescarNoFerri(m).ok, 'linha devia estar a descansar (cooldown)');
+  E.tick(m); E.tick(m); E.tick(m);
+  expect(E.jogadorPescarNoFerri(m).ok, 'após 3 ticks devia poder pescar outra vez');
+  // desembarca (toggle): fora do ferri a pescaria é recusada
+  E.jogadorNavegar(m);
+  expect(!E.jogadorPescarNoFerri(m).ok, 'fora do ferri não se pesca');
+  // serialização preserva a frota com cooldown
+  const dados = JSON.parse(E.serializar(m));
+  const m2 = E.criarMundo(CFG);
+  expect(E.deserializar(m2, dados) && m2.barcos.length === m.barcos.length, 'frota devia sobreviver ao ciclo JSON');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);

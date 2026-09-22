@@ -48,9 +48,14 @@ passo('⛵ Travessia completa: cais → Ponte do Leste → docas', () => {
   // ancorar o ferri no cais (o spawn é aleatório no mar; a travessia em si é o que se mede)
   const f0 = m.barcos.find(b => b.tipo === 'ferri');
   f0.x = wd.cais.x; f0.y = wd.cais.y + 18; f0.espera = 0;
-  // ida: embarcar no cais
+  // ida: embarcar no cais (o capitão dá as boas-vindas) e pescar a bordo
   j.x = wd.cais.x; j.y = wd.cais.y;
-  expect(E.jogadorNavegar(m).ok, 'embarque no cais');
+  const rEmb = E.jogadorNavegar(m);
+  expect(rEmb.ok && rEmb.msg.length > 'A bordo do ferri ⛵'.length, 'capitão devia dar as boas-vindas: ' + rEmb.msg);
+  const carteiraBordo = j.necessidades.dinheiro;
+  expect(E.jogadorPescarNoFerri(m).ok, 'pescaria a bordo devia funcionar');
+  expect(j.necessidades.dinheiro > carteiraBordo, 'pescado devia pagar');
+  expect(!E.jogadorPescarNoFerri(m).ok, 'cooldown devia impedir o 2º lançamento seguido');
   const ferri = m.barcos.find(b => b.tipo === 'ferri');
   let ticks = 0;
   while (ferri.passageiro === j.id && ticks++ < 140) E.tick(m);

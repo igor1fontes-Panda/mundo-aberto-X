@@ -38,7 +38,7 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 
 ```bash
 npm install   # Vite, React, Three.js, Recharts
-npm test      # 51 smoke tests do engine (Node puro)
+npm test      # 54 smoke tests do engine (Node puro)
 npm run dev   # dev server Vite em http://localhost:3000 (0.0.0.0, usa PORT)
 npm run build # gen + vite build → dist/ (produção)
 ```
@@ -47,7 +47,7 @@ Deploy: **Vercel** (framework Vite, output `dist/`) e **hosting Freebuff** (`npm
 
 ## Ao mudar o código
 
-- Testar sempre `npm test` após tocar no `engine.js` — os 51 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas), v9 (quest board, guerra & paz com mediação, tribunal, arcos de história, Kardashev), v9.1 (missões físicas com marcador no terreno, Tribunal com balança animada, Praça das Missões), v9.2 (missões de comboio com NPC escoltado, baú de recompensa físico no chão, fundo comum ergue Praça das Missões e Tribunal) e v10 (WestDocks: anexação da ilha, frota com atracadouro junto à Ponte do Leste, NPCs portuários, loja/farol/caserna, serialização). Existe também `node playtest-westdocks.js` — sessão simulada do Criador de ponta a ponta (8 passos).
+- Testar sempre `npm test` após tocar no `engine.js` — os 54 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas), v9 (quest board, guerra & paz com mediação, tribunal, arcos de história, Kardashev), v9.1 (missões físicas com marcador no terreno, Tribunal com balança animada, Praça das Missões), v9.2 (missões de comboio com NPC escoltado, baú de recompensa físico no chão, fundo comum ergue Praça das Missões e Tribunal), v10 (WestDocks: anexação da ilha, frota com atracadouro junto à Ponte do Leste, NPCs portuários, loja/farol/caserna, serialização), v10.1 (travessia completa do ferri, polícia rende piratas) e v10.2 (fala do capitão no embarque, pescaria a bordo com cooldown fib(4)). Existe também `node playtest-westdocks.js` — sessão simulada do Criador de ponta a ponta (8 passos).
 - **Arquitetura Vite.** `src/` é a fonte; o bundle sai em `dist/` via `npm run build`. O `engine.js` NÃO é importado como módulo (é CJS para os testes Node): o script `gen` copia-o para `public/engine.js` e o `index.html` carrega-o como script global antes do React. Se mexeres no `engine.js`, o `gen` sincroniza automaticamente ao correr `dev`/`build`.
 - O `index.html` tem painel de erro de boot que mostra a exceção em vez do loading eterno.
 - Three.js: manter o mapa dentro de `src/Mapa3D.jsx`; sincronizações de estado correm no rAF loop lendo props via ref (evita re-renders por tick).

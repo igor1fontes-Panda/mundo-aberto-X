@@ -1143,6 +1143,7 @@
       b.x = clamp(b.x + Math.cos(b.rumo) * v, mar.x0 - 20, mar.x1 + 20);
       b.y = clamp(b.y + Math.sin(b.rumo) * v, mar.y0 - 30, mar.y1);
       if (b.espera > 0) b.espera--;
+      if (b.pescariaCd > 0) b.pescariaCd--; // v10.2: linha a descansar entre lançamentos
       // ferri transporta o Criador (v10)
       if (b.tipo === 'ferri' && j && b.passageiro === j.id) {
         j.x = b.x; j.y = b.y; // viaja dentro do barco
@@ -1180,8 +1181,37 @@
     if (!emDocas && !emPonte) return { ok: false, erro: 'Vai ao cais das Docas Reais ou à Ponte do Leste para embarcar' };
     ferri.passageiro = j.id;
     ferri.destino = emDocas ? 'atracadouro' : 'docas';
+    // v10.2: o capitão dá as boas-vindas (falas data-driven, PT/EN)
+    const langJ = j.idioma || 'pt';
+    const listaBordo = ((((wd.capitao || {}).falas) || {})[langJ]) || (wd.capitao || {}).falas && wd.capitao.falas.pt || [];
+    const falaBordo = listaBordo.length ? pick(listaBordo) : '';
     logMundo(mundo, '⛵ Embarcaste no ferri ' + ferri.nome + ' — rumo ' + (ferri.destino === 'atracadouro' ? 'à Ponte do Leste' : 'a WestDocks') + '.');
-    return { ok: true, msg: 'A bordo do ferri ⛵' };
+    if (falaBordo) logMundo(mundo, '🧭 ' + falaBordo);
+    return { ok: true, msg: falaBordo ? 'A bordo do ferri ⛵ — ' + falaBordo : 'A bordo do ferri ⛵' };
+  }
+
+  // Pescaria a bordo do ferri (v10.2): 🎣 lança a linha durante a travessia.
+  // Régua Fibonacci: cooldown fib(4)=3 ticks; ganho entre fib(1)=1 e fib(3)+2;
+  // o farol aumenta o rendimento do cardume (+30%, como na frota).
+  function jogadorPescarNoFerri(mundo) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    const ferri = (mundo.barcos || []).find(b => b.tipo === 'ferri' && b.viva);
+    if (!ferri || ferri.passageiro !== j.id) return { ok: false, erro: 'Só pescas a bordo do ferri — embarca primeiro com ⛵' };
+    const wd = cfgWestDocks(mundo);
+    const fcfg = ((wd.pescaria || {}).ferri) || {};
+    const cd = fcfg.cooldownTicks != null ? fcfg.cooldownTicks : fib(4);
+    if ((ferri.pescariaCd || 0) > 0) return { ok: false, erro: 'A linha está a descansar (' + ferri.pescariaCd + ' ticks)' };
+    ferri.pescariaCd = cd;
+    const temFarol = mundo.construcoes.some(c => c.tipo === 'farol');
+    const bonus = temFarol ? (fcfg.farolBonus || 1.3) : 1;
+    const minG = fcfg.ganhoMin != null ? fcfg.ganhoMin : 2;
+    const maxG = fcfg.ganhoMax != null ? fcfg.ganhoMax : fib(3) + 2;
+    const ganho = Math.max(1, Math.round((minG + Math.random() * (maxG - minG)) * bonus));
+    const moeda = fcfg.moeda || 'sardinhas';
+    j.necessidades.dinheiro += ganho;
+    logMundo(mundo, '🎣 Pescaste ' + ganho + ' ' + moeda + ' a bordo do ' + ferri.nome + '(+' + ganho + '🪙)' + (temFarol ? ' — o farol iluminou o cardume' : '') + '.');
+    return { ok: true, msg: '🎣 +' + ganho + '🪙 (' + moeda + ')' + (temFarol ? ' · farol +30%' : '') };
   }
 
   // Falar com um NPC de ambiente (v10): têm falas próprias em PT/EN
@@ -1996,7 +2026,7 @@
     tick, rodadaCriticos, gauntlet, construir, pesquisarIdea,
     enviarChat, mudarIdioma, falarAgente,
     jogadorComprar, jogadorOfertar, jogadorDarFerramenta, jogadorConstruir, jogadorPesquisar, jogadorMover,
-    anexarWestDocks, jogadorAnexarWestDocks, jogadorNavegar, falarNpc, custoFerramenta, temWestDocks,
+    anexarWestDocks, jogadorAnexarWestDocks, jogadorNavegar, jogadorPescarNoFerri, falarNpc, custoFerramenta, temWestDocks,
     jogadorInteragirSer, jogadorAtacar, jogadorDefender, jogadorGerarItem, jogadorPegar,
     atacarAgente, defenderAtivado, pegarItemNoMundo, gerarItemNoMundo,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,

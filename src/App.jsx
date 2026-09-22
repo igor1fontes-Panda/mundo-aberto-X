@@ -257,6 +257,12 @@ export default function App() {
     mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
     repintar();
   };
+  // v10.2: pescaria a bordo do ferri (só durante a travessia)
+  const pescarNoFerri = () => {
+    const r = E.jogadorPescarNoFerri(mundoRef.current);
+    mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
+    repintar();
+  };
   const [npcSelecionado, setNpcSelecionado] = useState(null);
   const falarComNpc = (np) => {
     setNpcSelecionado(np.id);
@@ -629,6 +635,13 @@ export default function App() {
                       className="px-3 py-2 rounded-xl text-xs font-black text-slate-900"
                       style={{ background: 'linear-gradient(135deg, #0891b2, #2563eb)' }}>
                       ⛵ Navegar
+                    </button>
+                  )}
+                  {jogador && m.westdocks && (
+                    <button onClick={pescarNoFerri} title="Pescar a bordo do ferri — só durante a travessia (o farol dá +30%)"
+                      className="px-3 py-2 rounded-xl text-xs font-black text-slate-900"
+                      style={{ background: 'linear-gradient(135deg, #22d3ee, #0ea5e9)' }}>
+                      🎣 Pescar a bordo
                     </button>
                   )}
                   {jogador && (
