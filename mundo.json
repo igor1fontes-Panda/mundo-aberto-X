@@ -1,4 +1,12 @@
 {
+  "audio": {
+    "descricao": "Trilha procedural, ambientes e vozes (Web Audio + síntese de fala). Tudo gerado no browser — sem ficheiros binários.",
+    "ligado": true,
+    "trilha": { "tema": "cinematico", "acordesPorTema": { "jogo": [220.0, 261.63, 329.63], "dashboard": [174.61, 220.0, 261.63], "gauntlet": [146.83, 174.61, 220.0], "westdocks": [196.0, 246.94, 293.66] }, "segundosPorAcordo": 4.0, "intervaloTicksFib": 34 },
+    "ambientes": { "marOndas": { "tickFib": 34 }, "vento": { "tickFib": 55 }, "guCho": { "tickFib": 21 }, "passaro": { "tickFib": 21 } },
+    "sfx": { "volume": 0.5 },
+    "voz": { "idiomaPadrao": "pt-PT", "rate": 0.95, "pitch": 1.0, "comentar": true }
+  },
   "meta": {
     "nome": "Mundo Aberto X",
     "versao": 10,
