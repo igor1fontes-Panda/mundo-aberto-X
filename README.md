@@ -2,7 +2,7 @@
 
 **Multiverso de agentes AI autónomos** — uma sociedade viva que corre no browser, com língua própria, economia, evolução genética e **um jogador dentro do mundo**.
 
-![versão](https://img.shields.io/badge/versão-10-22d3ee) ![testes](https://img.shields.io/badge/testes-51%20%E2%9C%93-34d399) ![deploy](https://img.shields.io/badge/Vercel-est%C3%A1tico-000) ![mobile](https://img.shields.io/badge/Android%2014-optimizado-34d399)
+![versão](https://img.shields.io/badge/versão-10-22d3ee) ![testes](https://img.shields.io/badge/testes-54%20%E2%9C%93-34d399) ![deploy](https://img.shields.io/badge/Vercel-est%C3%A1tico-000) ![mobile](https://img.shields.io/badge/Android%2014-optimizado-34d399)
 
 ---
 
@@ -21,7 +21,7 @@
 - **🏛️ Sociedade que se constrói a si própria (v6.1)** — o fundo comum ergue as instituições sozinho (Escola primeiro!), financia ideias que desbloqueiam construções e paga bolsas a estudantes e académicos. Investe apenas com **reserva áurea** (custo × φ de folga) e fome média baixa — nunca se arruína a construir. Salários garantidos a todas as profissões (professor, académico, cuidador) e colocação imediata para graduados: **zero mortes por estagnação económica.**
 - **🧊 Mundo em 3D top-down (v7)** — mapa renderizado em Three.js (câmera ortográfica inclinada): chunks/zonas/ruas, construções em caixas 3D com emoji, habitantes e fauna animados. Arrasta para pan, roda para zoom, clica no terreno para andar, clica num ser para o selecionar — e 🎯 segue o Criador pela câmera.
 - **🗺️ Mapa RPG expansível (v6)** — ruas nomeadas e zonas em chunks; cada anexação custa fib(n)×200 e chega com novo distrito, ruas e espaço para a fauna.
-- **⚓ Reino de WestDocks (v10)** — cidade-irmã à beira-mar, ligada por ponte (terra) e ferri (mar): docas, pub, loja com desconto, farol, caserna e bairro de casas. Frota viva no Mar de West — ferri de passagem, pesqueiros que pagam o pescado ao fundo comum e piratas que se rendem à polícia — e NPCs portuários (estivadores, taberneiro, faroleiro) que chegam em saltos fib(7).
+- **⚓ Reino de WestDocks (v10)** — cidade-irmã à beira-mar, ligada por ponte (terra) e ferri (mar): docas, pub, loja com desconto, farol, caserna e bairro de casas. Frota viva no Mar de West — ferri de passagem, pesqueiros que pagam o pescado ao fundo comum e piratas que se rendem à polícia — e NPCs portuários (estivadores, taberneiro, faroleiro) que chegam em saltos fib(7). O capitão do ferri dá as boas-vindas em PT/EN e há 🎣 pescaria a bordo durante a travessia (cooldown fib(4), farol +30%).
 - **🐾 Fauna viva (v6)** — animais vagueiam, ferem-se, reproduzem-se em saltos fib(7) e são curados por cuidadores, hospitais ou pelo Criador.
 - **📱 Touch/gameplay (v6)** — d-pad contínuo + botões de ação (Falar, Dar, Curar, Alimentar, +Território), otimizado para Android 14 (PWA, sem zoom por duplo-toque, sem overscroll).
 - **💾 Mundo 100% .json** — autosave + export/import: o mundo inteiro num ficheiro.
@@ -31,7 +31,7 @@
 
 ```bash
 npm install   # Vite, React, Three.js, Recharts
-npm test      # 51 smoke tests do engine (+ node playtest-westdocks.js: sessão simulada do Criador)
+npm test      # 54 smoke tests do engine (+ node playtest-westdocks.js: sessão simulada do Criador)
 npm run dev   # dev server em http://localhost:3000 (usa PORT para mudar)
 npm run build # produção → dist/
 ```

@@ -843,6 +843,24 @@
   "westdocks": {
     "descricao": "Reino de WestDocks (v10): cidade-irmã à beira-mar, ligada ao continente por ponte (terra) e ferri (mar). Docas, taberna, loja, farol, caserna, bairro de casas — e piratas ao largo.",
     "custoAnexar": 1618,
+    "capitao": {
+      "nome": "Capitão do ferri",
+      "falas": {
+        "pt": [
+          "Bem-vindo a bordo! Segura-te quando dobrarmos a boia.",
+          "Hoje o Mar de West está manso — boa travessia, Criador.",
+          "Se vires uma vela negra, avisa: eu conheço estes navios todos.",
+          "O farol guia-nos. O vento faz o resto."
+        ],
+        "en": [
+          "Welcome aboard! Hold tight when we round the buoy.",
+          "The West Sea is calm today — smooth sailing, Creator.",
+          "If you spot a black sail, shout: I know every ship out here.",
+          "The lighthouse guides us. The wind does the rest."
+        ]
+      }
+    },
+    "pescaria": { "ferri": { "cooldownTicks": 3, "ganhoMin": 2, "ganhoMax": 4, "farolBonus": 1.3, "moeda": "sardinhas" } },
     "mundoLargura": 960,
     "mar": { "y0": 330, "altura": 150 },
     "largo": { "x": 700, "y": 90, "w": 150, "h": 120 },
