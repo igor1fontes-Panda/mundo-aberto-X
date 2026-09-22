@@ -5,7 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 /* ============================================================
-   MAPA 3D TOP-DOWN — Three.js (câmera ortográfica inclinada)
+   MAPA 3D — Three.js (câmara em perspetiva 3/4 com órbita livre)
    v8: estilo jogo moderno —
    - Habitantes anime chibi: cabeça grande, cabelo, olhos com brilho,
      braços/pernas animados, andar interpolado (sem teleportes)
@@ -234,6 +234,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
   const cbRef = useRef({});
   cbRef.current = { m, CFG, dim, jogador, selecionadoId, alvoFauna, onMover, onSelecionar, onFauna };
   const [seguir, setSeguir] = useState(false);
+  const [tiltNome, setTiltNome] = useState('3D');
   const seguirRef = useRef(false);
   seguirRef.current = seguir;
   const [webglErro, setWebglErro] = useState(false);
@@ -258,16 +259,17 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0b1026, 1000, 2600);
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000);
-    const amb = new THREE.AmbientLight(0xbfd4ff, 1.05);
+    scene.fog = new THREE.Fog(0x0b1026, 900, 3000); // névoa de profundidade (ajustada por frame)
+    const camera = new THREE.PerspectiveCamera(42, 16 / 9, 10, 4600);
+    const amb = new THREE.AmbientLight(0xbfd4ff, 0.85);
+    const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x24352a, 0.55); // céu/solo — volume nas faces verticais
     const dir = new THREE.DirectionalLight(0xffffff, 1.15);
-    dir.position.set(300, 400, -160);
-    scene.add(amb, dir);
+    dir.position.set(300, 400, -420); // sol rasante → sombras longas = leitura 3D
+    scene.add(amb, hemi, dir);
     dir.castShadow = true;
     dir.shadow.mapSize.set(2048, 2048);
     dir.shadow.camera.near = 50;
-    dir.shadow.camera.far = 1400;
+    dir.shadow.camera.far = 2400;
     dir.shadow.bias = -0.0005;
     dir.shadow.normalBias = 0.02;
     // pós-processamento: bloom ligeiro (lamps/vagalumes/emojis brilham)
@@ -288,6 +290,12 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     let groundMesh = null;
     let zoom = 1;
     let target = new THREE.Vector2(320, 160);
+    // câmara orbital: yaw (rotação) + elev (inclinação) — a perspetiva dá o feel 3D
+    let yaw = 0;
+    let elev = 55 * Math.PI / 180; // vista 3/4 por omissão (não top-down)
+    const FOV = 42;
+    const TILT_PRESETS = [55, 38, 76]; // 3D · cinematográfica · quase-topo
+    const CAM_BASE = 640; // distância = CAM_BASE / zoom
     let lastM = null;
     let lastChunks = -1;
     let lastBuilds = -1;
@@ -332,14 +340,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     function updateFrustum() {
       const w = mount.clientWidth || 800;
       const h = mount.clientHeight || 420;
-      const aspect = w / h;
-      const view = 560 / zoom;
-      camera.left = (-view * aspect) / 2;
-      camera.right = (view * aspect) / 2;
-      camera.top = view / 2;
-      camera.bottom = -view / 2;
-      camera.near = 1;
-      camera.far = 4000;
+      camera.aspect = w / h;
+      camera.fov = FOV;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
       composer.setSize(w, h);
@@ -427,14 +429,9 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         crown.position.y = 22.3;
         g.add(crown);
       }
-      // emoji flutuante + etiqueta de nome
-      const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(arq.emoji || '👤'), depthTest: false, transparent: true }));
-      emoji.scale.set(16, 16, 1);
-      emoji.position.y = 30;
-      emoji.renderOrder = 9;
-      g.add(emoji);
+      // etiqueta de nome (sem ícone flutuante sobre a cabeça)
       const nome = labelSprite(ag.nome, arq.cor || '#94a3b8');
-      nome.position.y = 38;
+      nome.position.y = 30;
       g.add(nome);
 
       g.userData.anim = { legs, arms, head, body };
@@ -516,13 +513,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const pack = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.0, 2.2), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }));
       pack.position.set(0, 6.4, -3.4);
       g.add(pack);
-      const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(np.emoji || '🧍'), depthTest: false, transparent: true }));
-      emoji.scale.set(13, 13, 1);
-      emoji.position.y = 23;
-      emoji.renderOrder = 9;
-      g.add(emoji);
       const nome = labelSprite(np.nome, np.cor || '#94a3b8');
-      nome.position.y = 30;
+      nome.position.y = 22;
       nome.scale.multiplyScalar(0.85); // etiqueta mais discreta que a dos agentes
       g.add(nome);
       g.userData.anim = { body, head, pack };
@@ -598,11 +590,6 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           guelra.position.set(sx, 8.6, 1.4); guelra.rotation.z = sx > 0 ? -0.9 : 0.9; g.add(guelra);
         }
       }
-      const emoji = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(an.emoji || '🐾'), depthTest: false, transparent: true }));
-      emoji.scale.set(13, 13, 1);
-      emoji.position.y = 19;
-      emoji.renderOrder = 9;
-      g.add(emoji);
       g.userData.forma = an.forma || null;
       g.userData.anim = { head, tail, body, ...extras };
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -1142,8 +1129,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         terrainGroup.add(telhado);
         addEmoji(def.emoji, bx, altura + 16, bz);
       });
-      // luz direcional centrada no mundo
-      dir.position.set(w / 2, 420, h / 2 - 180);
+      // luz direcional centrada no mundo (rasante → sombras longas e visíveis)
+      dir.position.set(w / 2, 470, h / 2 - 460);
       dir.shadow.camera.left = -Math.max(w, 700);
       dir.shadow.camera.right = Math.max(w, 700);
       dir.shadow.camera.top = Math.max(h, 700);
@@ -1231,7 +1218,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const agora = performance.now();
       const duplo = agora - lastTapT < 320; // duplo-toque = correr
       lastTapT = agora;
-      pointer = { x: ev.clientX, y: ev.clientY, tx: target.x, tz: target.y, moved: false, correr: duplo };
+      pointer = { x: ev.clientX, y: ev.clientY, tx: target.x, tz: target.y, moved: false, correr: duplo, orbita: ev.button === 2 || ev.shiftKey };
       renderer.domElement.setPointerCapture?.(ev.pointerId);
     };
     const onMove = (ev) => {
@@ -1240,13 +1227,25 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       const dy = ev.clientY - pointer.y;
       if (!pointer.moved && Math.hypot(dx, dy) < 5) return;
       pointer.moved = true;
+      if (pointer.orbita) {
+        // botão direito / Shift+arrastar = orbitar a câmara (rodar + inclinar)
+        yaw -= dx * 0.005;
+        elev = Math.min(Math.max(elev + dy * 0.004, 0.32), 1.5);
+        return;
+      }
+      // pan no plano do terreno, corrigido pelo ângulo da câmara (yaw + inclinação)
       const w = mount.clientWidth, h = mount.clientHeight;
-      const view = 560 / zoom;
-      const worldPerPxY = view / h;
-      const worldPerPxX = (view * (w / h)) / w;
+      const dist = CAM_BASE / zoom;
+      const tanF = Math.tan((FOV * Math.PI / 180) / 2);
+      const wpX = (2 * tanF * dist * (w / h)) / w;
+      const wpYf = (2 * tanF * dist) / h / Math.sin(elev); // foreshortening da vista inclinada
+      const rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
+      const awayX = -Math.sin(yaw), awayZ = -Math.cos(yaw);
       const { dim: D } = cbRef.current;
-      target.x = Math.min(Math.max(pointer.tx - dx * worldPerPxX, 0), D.w);
-      target.y = Math.min(Math.max(pointer.tz - dy * worldPerPxY, 0), D.h);
+      const nx = pointer.tx - dx * wpX * rightX - dy * wpYf * awayX;
+      const nz = pointer.tz - dx * wpX * rightZ - dy * wpYf * awayZ;
+      target.x = Math.min(Math.max(nx, 0), D.w);
+      target.y = Math.min(Math.max(nz, 0), D.h);
     };
     const onUp = (ev) => {
       if (pointer && !pointer.moved) {
@@ -1266,14 +1265,27 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       updateFrustum();
     };
     const zoomPor = (f) => { zoom = Math.min(Math.max(zoom * f, 0.35), 5); updateFrustum(); };
-    threeRef.current = { zoomPor };
+    const orbitar = (dyaw, delev) => {
+      yaw += dyaw;
+      elev = Math.min(Math.max(elev + delev, 0.32), 1.5);
+    };
+    const cicloTilt = () => {
+      const graus = Math.round((elev * 180) / Math.PI);
+      const idx = TILT_PRESETS.findIndex(g => Math.abs(g - graus) < 3);
+      const prox = TILT_PRESETS[(idx + 1) % TILT_PRESETS.length];
+      elev = (prox * Math.PI) / 180;
+      return prox;
+    };
+    threeRef.current = { zoomPor, orbitar, cicloTilt };
 
     const dom = renderer.domElement;
+    const noCtx = (e) => e.preventDefault(); // botão direito = órbita, não menu
     dom.addEventListener('pointerdown', onDown);
     dom.addEventListener('pointermove', onMove);
     dom.addEventListener('pointerup', onUp);
     dom.addEventListener('pointerleave', () => { pointer = null; });
     dom.addEventListener('wheel', onWheel, { passive: false });
+    dom.addEventListener('contextmenu', noCtx);
 
     const ro = new ResizeObserver(() => updateFrustum());
     ro.observe(mount);
@@ -1536,8 +1548,19 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         target.x += (j.x - target.x) * 0.08;
         target.y += (j.y - target.y) * 0.08;
       }
-      camera.position.set(target.x, 400, target.y + 170);
+      // câmara orbital em perspetiva — o ângulo 3/4 dá profundidade real ao mundo
+      const dist = CAM_BASE / zoom;
+      const cosE = Math.cos(elev), sinE = Math.sin(elev);
+      camera.position.set(
+        target.x + Math.sin(yaw) * cosE * dist,
+        sinE * dist,
+        target.y + Math.cos(yaw) * cosE * dist
+      );
       camera.lookAt(target.x, 0, target.y);
+      // névoa acompanha a distância → plano de profundidade sempre visível
+      scene.fog.near = dist + 260;
+      scene.fog.far = dist + 2400;
+      hemi.intensity = 0.3 + dayF * 0.4;
       composer.render();
     }
     raf = requestAnimationFrame(frame);
@@ -1549,6 +1572,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       dom.removeEventListener('pointermove', onMove);
       dom.removeEventListener('pointerup', onUp);
       dom.removeEventListener('wheel', onWheel);
+      dom.removeEventListener('contextmenu', noCtx);
       disposeDeep(scene);
       renderer.dispose();
       composer.dispose?.();
@@ -1574,6 +1598,12 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             className="px-2 py-1 rounded-lg text-xs font-black" style={{ background: 'rgba(15,23,42,.85)', border: '1px solid #334155', color: '#cbd5e1' }}>＋</button>
           <button onClick={() => threeRef.current && threeRef.current.zoomPor(1 / 1.25)}
             className="px-2 py-1 rounded-lg text-xs font-black" style={{ background: 'rgba(15,23,42,.85)', border: '1px solid #334155', color: '#cbd5e1' }}>－</button>
+          <button onClick={() => { const t = threeRef.current; if (t) { const g = t.cicloTilt(); setTiltNome(g === 38 ? '🎬' : g === 76 ? '⬆' : '3D'); } }}
+            className="px-2 py-1 rounded-lg text-[10px] font-bold" style={{ background: 'rgba(15,23,42,.85)', border: '1px solid #334155', color: '#cbd5e1' }}>📐 {tiltNome}</button>
+          <button onClick={() => threeRef.current && threeRef.current.orbitar(-0.35, 0)}
+            className="px-2 py-1 rounded-lg text-xs font-black" style={{ background: 'rgba(15,23,42,.85)', border: '1px solid #334155', color: '#cbd5e1' }}>⟲</button>
+          <button onClick={() => threeRef.current && threeRef.current.orbitar(0.35, 0)}
+            className="px-2 py-1 rounded-lg text-xs font-black" style={{ background: 'rgba(15,23,42,.85)', border: '1px solid #334155', color: '#cbd5e1' }}>⟳</button>
           <button onClick={() => setSeguir(s => !s)}
             className="px-2 py-1 rounded-lg text-[10px] font-bold" style={{ background: seguir ? '#0e7490' : 'rgba(15,23,42,.85)', border: '1px solid #334155', color: seguir ? '#fff' : '#94a3b8' }}>
             🎯 {seguir ? 'a seguir' : 'seguir'}
