@@ -4,7 +4,7 @@
    - Navegações offline caem no shell em cache
    - Sem runtime caching de APIs externas (não usamos nenhuma)
    Versão bumped manualmente quando o shell mudar */
-const VERSAO = 'mun-x-v7.0';
+const VERSAO = 'mun-x-v10.3'; // atualizar sempre que o shell/engine mudar (quebra cache dos visitantes antigos)
 const SHELL = `${VERSAO}-shell`;
 const IMUTAVEIS = `${VERSAO}-assets`;
 
