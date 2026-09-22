@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 
 /* ============================================================
    MINIMAPA — vista estratégica 2D do mundo inteiro (v9)
