@@ -32,12 +32,13 @@ Guia para agentes AI (Claude Code, Codebuff, Cursor, etc.) a trabalharem neste r
 7. **Protocolos da Continuidade (v6.1).** O fundo comum é o motor da sociedade autónoma: ergue construções com **reserva áurea** (`custo × 1.618` de folga) e só com fome média < 50; financia pesquisas de ideias que bloqueiam construções; paga bolsas (`skills.bolsaAula`, `skills.bolsaAcademico`) a estudantes/académicos; e tem rede de segurança alimentar (dispara com φ dos vivos famintos). A Escola tem prioridade absoluta — é ela que desbloqueia estudantes → professores → academia.
 8. **Ninguém trabalha de graça.** Toda a profissão paga (`ensinar` tem salário-base mesmo sem alunos; `cuidarFaunaAcao` paga o ganho; `evoluirSkill` recebe bolsa do fundo ou ganho/2). Qualquer desempregado procura vocação automaticamente — não há rentistas parados. Quem gradua recebe colocação imediata (`profissaoPorTracos`).
 9. **O Criador está fora da simulação mortal.** `isCriador`: sem metabolismo, sem Gauntlet, sem adaptación evolutiva — regenera +2 saúde/tick. Nunca adicionar mecânicas que visem o jogador.
+10. **WestDocks é uma cidade-irmã, não um chunk.** Anexa-se com `jogadorAnexarWestDocks()` (custo áureo 1618🪙) e vive em `mundo.westdocks` + edifícios com `wx/wy` + `mundo.barcos`. O Mar de West é ancorado à ilha (`westdocks.mar.y0`), não ao mundo; a travessia do ferri usa o **atracadouro** junto à Ponte do Leste (a ponte é terra — o casco não a alcança) e os desembarques fazem snap para terra firme (cais ou cabeceira). Barcos têm clamp próprio de mar: mexer no `dimensoesMundo` não os afeta.
 
 ## Como correr
 
 ```bash
 npm install   # Vite, React, Three.js, Recharts
-npm test      # 32 smoke tests do engine (Node puro)
+npm test      # 51 smoke tests do engine (Node puro)
 npm run dev   # dev server Vite em http://localhost:3000 (0.0.0.0, usa PORT)
 npm run build # gen + vite build → dist/ (produção)
 ```
@@ -46,7 +47,7 @@ Deploy: **Vercel** (framework Vite, output `dist/`) e **hosting Freebuff** (`npm
 
 ## Ao mudar o código
 
-- Testar sempre `npm test` após tocar no `engine.js` — os 47 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas), v9 (quest board, guerra & paz com mediação, tribunal, arcos de história, Kardashev) v9.1 (missões físicas com marcador no terreno, Tribunal com balança animada, Praça das Missões) e v9.2 (missões de comboio com NPC escoltado, baú de recompensa físico no chão, fundo comum ergue Praça das Missões e Tribunal).
+- Testar sempre `npm test` após tocar no `engine.js` — os 51 testes cobrem Fibonacci, Lume, LumeBrain, críticos, Gauntlet, chat PT/EN, jogador, import/export, morte, v6 (escola/skills/fauna/chunks/conduta), v6.1 (Protocolos da Continuidade), v8 (combate ligado, itens no chão, 20 profissões, mundo com 7 territórios) e v8.1 (movimento por toque, fauna com temperamentos, NPCs de ambiente com tarefas), v9 (quest board, guerra & paz com mediação, tribunal, arcos de história, Kardashev), v9.1 (missões físicas com marcador no terreno, Tribunal com balança animada, Praça das Missões), v9.2 (missões de comboio com NPC escoltado, baú de recompensa físico no chão, fundo comum ergue Praça das Missões e Tribunal) e v10 (WestDocks: anexação da ilha, frota com atracadouro junto à Ponte do Leste, NPCs portuários, loja/farol/caserna, serialização). Existe também `node playtest-westdocks.js` — sessão simulada do Criador de ponta a ponta (8 passos).
 - **Arquitetura Vite.** `src/` é a fonte; o bundle sai em `dist/` via `npm run build`. O `engine.js` NÃO é importado como módulo (é CJS para os testes Node): o script `gen` copia-o para `public/engine.js` e o `index.html` carrega-o como script global antes do React. Se mexeres no `engine.js`, o `gen` sincroniza automaticamente ao correr `dev`/`build`.
 - O `index.html` tem painel de erro de boot que mostra a exceção em vez do loading eterno.
 - Three.js: manter o mapa dentro de `src/Mapa3D.jsx`; sincronizações de estado correm no rAF loop lendo props via ref (evita re-renders por tick).

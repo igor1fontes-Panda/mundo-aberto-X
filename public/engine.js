@@ -1068,6 +1068,12 @@
     const ponteX = wd.ponte ? wd.ponte.x + (wd.ponte.comprimento || 70) : dimensoesMundo(mundo).w * 0.6;
     const ponteY = wd.ponte ? wd.ponte.y : 120;
     const caisX = wd.cais.x, caisY = wd.cais.y + 18;
+    // v10.1: atracadouro navegável ao pé da Ponte do Leste — a ponte é terra firme
+    // (y=120 < mar.y0=300) e o casco do ferri não a pode alcançar; atraca no mar
+    // junto à cabeceira e o passageiro desembarca para caminhar pela ponte.
+    const atr = wd.atracadouro || { x: ponteX - 30, y: (mar.y0 + 6) };
+    const atrX = atr.x, atrY = atr.y;
+    const noAtracadouro = b => Math.hypot(b.x - atrX, b.y - atrY) < 26;
     mundo.barcos.forEach(b => {
       if (!b.viva) return;
       if (b.tipo === 'pirata') {
@@ -1115,17 +1121,17 @@
         } else {
           if (Math.random() < 0.3) b.rumo += (Math.random() - 0.5) * 0.8;
           b.carga = (b.carga || 0) + 1.5; // a rede enche
-          if (!noMar(mundo, b.x, b.y)) b.rumo = Math.atan2((mar.y0 + mar.y1) / 2 - b.y, (mar.x0 + mar.x1) / 2 - b.x);
+          if (!noMar(mundo, b.x, b.y) && !noAtracadouro(b)) b.rumo = Math.atan2((mar.y0 + mar.y1) / 2 - b.y, (mar.x0 + mar.x1) / 2 - b.x);
         }
       } else {
-        // ferri: parte das docas a cada fib(8)=21 ticks para a Ponte do Leste e volta
+        // ferri: parte das docas a cada fib(8)=21 ticks para o atracadouro da ponte e volta
         b.fase += 1;
         const ciclo = bcfg.ferriPartidaTicks || 21;
         const emDocas = Math.hypot(b.x - caisX, b.y - caisY) < 24;
-        if (emDocas && b.espera <= 0 && b.fase % ciclo === 0) { b.destino = 'ponte'; b.espera = fib(3); }
-        if (b.destino === 'ponte') {
-          b.rumo = Math.atan2(ponteY - b.y, ponteX - b.x);
-          if (Math.hypot(b.x - ponteX, b.y - ponteY) < 26) { b.destino = 'docas'; b.espera = fib(4); }
+        if (emDocas && b.espera <= 0 && b.fase % ciclo === 0) { b.destino = 'atracadouro'; b.espera = fib(3); }
+        if (b.destino === 'atracadouro') {
+          b.rumo = Math.atan2(atrY - b.y, atrX - b.x);
+          if (noAtracadouro(b)) { b.destino = 'docas'; b.espera = fib(4); }
         } else {
           b.rumo = Math.atan2(caisY - b.y, caisX - b.x);
           if (emDocas && b.espera <= 0) b.espera = 1; // parado no cais entre partidas
@@ -1140,12 +1146,14 @@
       // ferri transporta o Criador (v10)
       if (b.tipo === 'ferri' && j && b.passageiro === j.id) {
         j.x = b.x; j.y = b.y; // viaja dentro do barco
-        if (b.destino === 'docas' && Math.hypot(b.x - caisX, b.y - caisY) < 34) {
+        if (b.destino === 'docas' && Math.hypot(b.x - caisX, b.y - caisY) < 40) {
           b.passageiro = null; b.espera = fib(3);
+          j.x = caisX; j.y = caisY; // desembarque em terra firme, sobre o cais (v10.1b)
           logMundo(mundo, '⛵ Chegaste às Docas Reais de WestDocks.');
-        } else if (b.destino === 'ponte' && Math.hypot(b.x - ponteX, b.y - ponteY) < 34) {
+        } else if (b.destino === 'atracadouro' && noAtracadouro(b)) {
           b.passageiro = null; b.espera = fib(3);
-          logMundo(mundo, '⛵ Chegaste à Ponte do Leste — o continente fica a um passo.');
+          j.x = ponteX; j.y = ponteY; // desembarque na cabeceira da Ponte do Leste
+          logMundo(mundo, '⛵ Atracaste junto à Ponte do Leste — o continente fica a um passo.');
         }
       }
     });
@@ -1171,8 +1179,8 @@
     const emPonte = Math.hypot(j.x - ponteX, j.y - ponteY) < 90;
     if (!emDocas && !emPonte) return { ok: false, erro: 'Vai ao cais das Docas Reais ou à Ponte do Leste para embarcar' };
     ferri.passageiro = j.id;
-    ferri.destino = emDocas ? 'ponte' : 'docas';
-    logMundo(mundo, '⛵ Embarcaste no ferri ' + ferri.nome + ' — rumo ' + (ferri.destino === 'ponte' ? 'à Ponte do Leste' : 'a WestDocks') + '.');
+    ferri.destino = emDocas ? 'atracadouro' : 'docas';
+    logMundo(mundo, '⛵ Embarcaste no ferri ' + ferri.nome + ' — rumo ' + (ferri.destino === 'atracadouro' ? 'à Ponte do Leste' : 'a WestDocks') + '.');
     return { ok: true, msg: 'A bordo do ferri ⛵' };
   }
 

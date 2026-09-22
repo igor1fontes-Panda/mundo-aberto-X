@@ -478,6 +478,7 @@
       "custo": 850,
       "emoji": "⚓",
       "efeito": "Ancora os barcos: ferri de passagem, pesca no mar de West e mercadoria",
+      "atracadouroPonte": "No atacadouro junto à Ponte do Leste, o ferri chega e parte — a travessia ilha↔continente completa-se por mar.",
       "cor": "#f59e0b"
     },
     "farol": {
@@ -858,6 +859,7 @@
     ],
     "cais": { "x": 705, "y": 262 },
     "ponte": { "x": 640, "y": 120, "comprimento": 70 },
+    "atracadouro": { "x": 614, "y": 300, "largura": 34 },
     "barcos": {
       "descricao": "Frota de WestDocks: ferri de passagem, barco de pesca e esquadras de piratas",
       "ferriPartidaTicks": 21,
