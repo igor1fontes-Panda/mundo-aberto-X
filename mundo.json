@@ -451,6 +451,13 @@
       "emoji": "📜",
       "efeito": "Board de missões físico: aceita missões e segue o marcador no terreno",
       "cor": "#fbbf24"
+    },
+    "fazenda": {
+      "nome": "Fazenda do Vale",
+      "custo": 700,
+      "emoji": "🚜",
+      "efeito": "Rural: animais de fazenda pastam aqui, gado alimentado por elas não adoece",
+      "cor": "#ca8a04"
     }
   },
   "ideias": [
@@ -789,9 +796,19 @@
       }
     ]
   },
+  "natureza": {
+    "descricao": "Paisagem viva: densidades de vegetação e relevo. Números em múltiplos de Fibonacci — a régua que governa o mundo.",
+    "arvoresPorChunk": 21,
+    "floresPorZona": 26,
+    "rochasPorChunk": 8,
+    "montesPorChunk": 2,
+    "montanhas": 3,
+    "montanha": { "raio": 34, "altura": 88, "cor": "#5b6472", "neve": "#f8fafc" },
+    "monte": { "raio": 26, "altura": 14 }
+  },
   "fauna": {
-    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados. Oito espécies com comportamentos distintos.",
-    "max": 20,
+    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados. Dezassete espécies: terrestres, aves voadoras (acima das copas) e peixes de lago.",
+    "max": 34,
     "espansivel": true,
     "especies": {
       "corredor": {
@@ -865,6 +882,96 @@
         "forma": "ouriço",
         "temperamento": "reservado",
         "descricao": "Enrola-se em espinhos quando o Gauntlet passa"
+      },
+      "aguia": {
+        "nome": "Águia do Horizon",
+        "emoji": "🦅",
+        "cor": "#a16207",
+        "velocidade": 4,
+        "forma": "aguia",
+        "temperamento": "observador",
+        "habitat": "ar",
+        "descricao": "Sobrevoa as montanhas e avista tudo de cima"
+      },
+      "coruja": {
+        "nome": "Coruja do Lume",
+        "emoji": "🦉",
+        "cor": "#92766b",
+        "velocidade": 2,
+        "forma": "coruja",
+        "temperamento": "paciente",
+        "habitat": "ar",
+        "descricao": "Voa sobretudo ao anoitecer e dorme de dia"
+      },
+      "papagaio": {
+        "nome": "Papagaio Tropical",
+        "emoji": "🦜",
+        "cor": "#22c55e",
+        "velocidade": 3,
+        "forma": "papagaio",
+        "temperamento": "curioso",
+        "habitat": "ar",
+        "descricao": "Repete pedaços da língua Lume que ouve por aí"
+      },
+      "truta": {
+        "nome": "Truta Prisma",
+        "emoji": "🐟",
+        "cor": "#38bdf8",
+        "velocidade": 2,
+        "forma": "peixe",
+        "temperamento": "esquivo",
+        "habitat": "agua",
+        "descricao": "Vive nos lagos e salta em arcos de prata"
+      },
+      "carpa": {
+        "nome": "Carpa Dourada",
+        "emoji": "🐠",
+        "cor": "#fbbf24",
+        "velocidade": 1,
+        "forma": "peixe",
+        "temperamento": "reservado",
+        "habitat": "agua",
+        "descricao": "Nada devagar junto à margem dos lagos"
+      },
+      "vaca": {
+        "nome": "Vaca Mu-Data",
+        "emoji": "🐄",
+        "cor": "#f8fafc",
+        "velocidade": 1,
+        "forma": "vaca",
+        "temperamento": "dorminhoco",
+        "habitat": "fazenda",
+        "descricao": "Paste calma perto da fazenda; dá leite ao mundo"
+      },
+      "ovelha": {
+        "nome": "Ovelha Algodão",
+        "emoji": "🐑",
+        "cor": "#e7e5e4",
+        "velocidade": 1,
+        "forma": "ovelha",
+        "temperamento": "gregário",
+        "habitat": "fazenda",
+        "descricao": "Segue o rebanho em fila indiana pelo campo"
+      },
+      "cavalo": {
+        "nome": "Cavalo Trovão",
+        "emoji": "🐎",
+        "cor": "#78350f",
+        "velocidade": 5,
+        "forma": "cavalo",
+        "temperamento": "curioso",
+        "habitat": "fazenda",
+        "descricao": "Puxa a carroça do cocheiro e galopa ao amanhecer"
+      },
+      "galo": {
+        "nome": "Galo Aurélio",
+        "emoji": "🐓",
+        "cor": "#dc2626",
+        "velocidade": 2,
+        "forma": "galo",
+        "temperamento": "observador",
+        "habitat": "fazenda",
+        "descricao": "Canta ao amanhecer e vigia o terreiro"
       }
     }
   },
@@ -919,6 +1026,30 @@
         "tarefa": "Empurra a barraca entre zonas e regateia com o vento",
         "pontoA": "vila",
         "pontoB": "campos"
+      },
+      "cocheiro": {
+        "nome": "Cocheiro de Estrada",
+        "emoji": "🐎",
+        "cor": "#7c2d12",
+        "tarefa": "Leva a carroça de carga entre vila e campos",
+        "pontoA": "vila",
+        "pontoB": "campos"
+      },
+      "pastor": {
+        "nome": "Pastora do Rebanho",
+        "emoji": "🧶",
+        "cor": "#65a30d",
+        "tarefa": "Leva as ovelhas a pastar entre campos e floresta",
+        "pontoA": "campos",
+        "pontoB": "floresta"
+      },
+      "meliponicultor": {
+        "nome": "Apicultor das Colmeias",
+        "emoji": "🍯",
+        "cor": "#f59e0b",
+        "tarefa": "Cuida das colmeias e vende mel na feira",
+        "pontoA": "floresta",
+        "pontoB": "vila"
       }
     },
     "pausaTick": 21

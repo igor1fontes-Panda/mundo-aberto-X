@@ -495,7 +495,8 @@ export default function App() {
                   onMover={moverMapa} onSelecionar={setSelecionadoId} onFauna={setAlvoFauna}
                 />
                 {/* ===== MINIMAPA overlay (canto): dá acesso à vista estratégica ===== */}
-                <div className="absolute top-2 right-2 z-20 rounded-xl overflow-hidden shadow-2xl backdrop-blur"
+                {/* canto superior ESQUERDO: os botões de ação da câmara (+/−/📐/⟲/⟳/🎯) vivem à direita e nunca ficam tapados */}
+                <div className="absolute top-2 left-2 z-20 rounded-xl overflow-hidden shadow-2xl backdrop-blur"
                   style={{ background: 'rgba(2,6,23,0.72)', border: '1px solid #1e293b' }}>
                   <div className="px-2 pt-1 pb-0.5 flex items-center justify-between gap-2">
                     <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: CORES.acento }}>🗺️ Minimapa</span>

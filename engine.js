@@ -15,6 +15,7 @@
   const clamp = (v, min = 0, max = 100) => Math.max(min, Math.min(max, v));
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const gerarId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const hashStr = (s) => { let h = 0; const str = String(s); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h); };
 
   // ---------- REGRA DE FIBONACCI PARA TUDO ----------
   const FIB = [1, 1];
@@ -165,6 +166,7 @@
       chunksComprados: 0,
       fauna: null,
       fundoComum: 0,
+      lagos: null,           // v9.3: lagos registados pelo render 3D (peixes nadam neles)
       // v9: RPG anime mundo aberto — missões, diplomacia, justiça, história, Kardashev
       missoes: [],           // board de missões (quest board)
       diplomacia: null,      // { pactos, guerra, tensao, reputacaoCriador, processoPaz }
@@ -677,23 +679,30 @@
   }
 
   // ---------- FAUNA ----------
+  // Distribuição inicial: metade terrestre, aves no ar, peixes na água (v9.3)
   function criarFaunaInicial(mundo) {
     const cfg = mundo.cfg.fauna;
     const fauna = [];
-    const especies = Object.keys(cfg.especies);
-    for (let i = 0; i < 6; i++) {
-      const sp = especies[i % especies.length];
-      fauna.push(criarAnimal(mundo, sp));
-    }
+    const porHabitat = { terra: [], ar: [], agua: [], fazenda: [] };
+    Object.keys(cfg.especies).forEach(sp => {
+      const hab = (cfg.especies[sp].habitat || 'terra');
+      (porHabitat[hab] || porHabitat.terra).push(sp);
+    });
+    // quotas áureas: metade terra, aves φ⁻¹ de metade, peixes idem — todas as classes presentes desde o início
+    const quotas = { terra: 6, ar: 3, agua: 2, fazenda: 4 };
+    Object.keys(quotas).forEach(hab => {
+      const lista = porHabitat[hab];
+      for (let i = 0; i < Math.min(quotas[hab], lista.length); i++) fauna.push(criarAnimal(mundo, lista[i % lista.length]));
+    });
     return fauna;
   }
   function criarAnimal(mundo, especie) {
     const def = mundo.cfg.fauna.especies[especie] || pick(Object.values(mundo.cfg.fauna.especies));
     const d = dimensoesMundo(mundo);
     return { id: gerarId(), especie, nome: def.nome, emoji: def.emoji, cor: def.cor, velocidade: def.velocidade,
-      forma: def.forma || null, temperamento: def.temperamento || 'selvagem',
+      forma: def.forma || null, temperamento: def.temperamento || 'selvagem', habitat: def.habitat || 'terra',
       x: 20 + Math.random() * (d.w - 40), y: 20 + Math.random() * (d.h - 40),
-      estado: 'vivo', ferido: false, energia: 80, rumo: Math.random() * Math.PI * 2 };
+      estado: 'vivo', ferido: false, energia: 80, rumo: Math.random() * Math.PI * 2, saltando: 0 };
   }
 
   // Cada espécie anda à sua maneira (v8.1): temperamentos da fauna em mundo.json
@@ -740,6 +749,17 @@
     an.rumo = Math.atan2(Math.sin(an.rumo), Math.cos(an.rumo)); // normaliza
     return true;
   }
+  // Comportamento de habitat (v9.3): gado pastar junto às fazendas
+  function rumoHabitat(mundo, an) {
+    const fzs = mundo.construcoes.filter(c => c.tipo === 'fazenda');
+    if (!fzs.length) return false;
+    // posições determinísticas das construções no render 3D (bx = 44 + i×68, bz = 30)
+    const i = hashStr(an.id) % fzs.length;
+    const fzIdx = mundo.construcoes.indexOf(fzs[i]);
+    const bx = 44 + fzIdx * 68, bz = 30;
+    if (Math.random() < 0.35) an.rumo = Math.atan2(bz - an.y, bx - an.x) + (Math.random() - 0.5) * 0.7;
+    return true;
+  }
   function tickFauna(mundo) {
     const cfg = mundo.cfg.fauna;
     if (!mundo.fauna) mundo.fauna = criarFaunaInicial(mundo);
@@ -752,9 +772,44 @@
       novo.y = clamp(pai.y + 10, 10, mundo.cfg.mapa.altura - 10);
       mundo.fauna.push(novo);
     }
+    // v9.3: classes garantidas — aves e peixes entram sozinhos se faltarem;
+    // gado chega quando a primeira fazenda é erguida.
+    const temClasse = hab => mundo.fauna.some(an => (an.habitat || 'terra') === hab);
+    if (mundo.fauna.length < capFauna) {
+      if (!temClasse('ar')) {
+        const sp = Object.keys(cfg.especies).filter(s => cfg.especies[s].habitat === 'ar');
+        if (sp.length) { mundo.fauna.push(criarAnimal(mundo, pick(sp))); logMundo(mundo, '🦅 Uma ave nova sobrevoa o mundo.'); }
+      } else if (!temClasse('agua')) {
+        const sp = Object.keys(cfg.especies).filter(s => cfg.especies[s].habitat === 'agua');
+        if (sp.length) { mundo.fauna.push(criarAnimal(mundo, pick(sp))); logMundo(mundo, '🐟 Um peixe novo habita os lagos.'); }
+      } else if (temConstrucao(mundo, 'fazenda') && !temClasse('fazenda')) {
+        const sp = Object.keys(cfg.especies).filter(s => cfg.especies[s].habitat === 'fazenda');
+        if (sp.length) { const bicho = criarAnimal(mundo, pick(sp)); mundo.fauna.push(bicho); logMundo(mundo, `🚜 ${bicho.nome} mudou-se para a fazenda.`); }
+      }
+    }
     const d = dimensoesMundo(mundo);
+    const temFazenda = mundo.construcoes.some(c => c.tipo === 'fazenda');
     mundo.fauna.forEach(an => {
-      if (decidirRumo(mundo, an)) {
+      // Peixes nadam dentro do lago mais próximo (v9.3): fora de água, voltam a pressa
+      if (an.habitat === 'agua' && mundo.lagos && mundo.lagos.length) {
+        const lago = mundo.lagos.reduce((m2, l) => (Math.hypot(l.cx - an.x, l.cz - an.y) < Math.hypot(m2.cx - an.x, m2.cz - an.y) ? l : m2));
+        if (Math.hypot(lago.cx - an.x, lago.cz - an.y) > lago.w / 2 * 0.8) {
+          an.rumo = Math.atan2(lago.cz - an.y, lago.cx - an.x);
+        }
+        if (an.saltando > 0) an.saltando--;
+        else if (Math.random() < 1 / 8) an.saltando = 3; // salto a cada ~fib(6) ticks
+      }
+      if (an.habitat === 'fazenda' && temFazenda) {
+        // Gado junto da fazenda: come capim, energia sobe e a fazenda cuida de ferimentos.
+        // O rumo já foi decidido pelo rumoHabitat — não volta a decidir (gado não foge do capim).
+        const fzs = mundo.construcoes.filter(c => c.tipo === 'fazenda');
+        const fzIdx = mundo.construcoes.indexOf(fzs[hashStr(an.id) % fzs.length]);
+        const bx = 44 + fzIdx * 68, bz = 30;
+        if (Math.hypot(bx - an.x, bz - an.y) < 90) {
+          an.energia = clamp(an.energia + 6, 0, 100);
+          if (an.ferido && Math.random() < 0.4) { an.ferido = false; logMundo(mundo, `🚜 A fazenda cuidou de ${an.nome}.`); }
+        }
+      } else if (decidirRumo(mundo, an)) {
         const fomeFator = an.energia < 30 ? 1.4 : 1; // com fome, apressa-se
         an.x = clamp(an.x + Math.cos(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.w - 5);
         an.y = clamp(an.y + Math.sin(an.rumo) * an.velocidade * 2 * fomeFator, 5, d.h - 5);
@@ -1088,6 +1143,14 @@
           ag.necessidades.dinheiro += Math.floor(ag.necessidades.dinheiro * 0.01 * fib(3) / 2); // juros fib
         }
       });
+      if (c.tipo === 'fazenda') {
+        // A fazenda alimenta o mundo rural: cuida do gado ferido (Protocolo da Fauna, versão rural)
+        (mundo.fauna || []).forEach(an => {
+          if ((an.habitat || 'terra') === 'fazenda' && an.ferido && Math.random() < 0.2) {
+            an.ferido = false; logMundo(mundo, `\u{1F69C} A fazenda tratou ${an.nome}.`);
+          }
+        });
+      }
     });
 
     // Loop individual dos agentes
@@ -1576,6 +1639,7 @@
       chats: mundo.chats, jogadorId: mundo.jogador ? mundo.jogador.id : null,
       chunks: mundo.chunks, chunksComprados: mundo.chunksComprados,
       fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
+      lagos: mundo.lagos || null,
       npcs: mundo.npcs || null,
       missoes: mundo.missoes || [], diplomacia: mundo.diplomacia || null,
       tribunal: mundo.tribunal || null, historia: mundo.historia || null, kardashev: mundo.kardashev || null,
@@ -1600,6 +1664,7 @@
     mundo.chunksComprados = dados.chunksComprados || 0;
     mundo.fauna = dados.fauna || null;
     mundo.fundoComum = dados.fundoComum || 0;
+    mundo.lagos = dados.lagos || null; // v9.3: lagos do render 3D
     mundo.faunaMaxExtra = dados.faunaMaxExtra || 0;
     mundo.itensNoChao = dados.itensNoChao || [];
     // v8.1: NPCs de ambiente (migração: mundos antigos não os têm)
