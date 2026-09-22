@@ -310,6 +310,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     const npcMap = new Map();
     const faunaMap = new Map();
     const itemsMap = new Map();
+    const boatMap = new Map(); // v10: frota do Mar de West
 
     const selRing = new THREE.Mesh(
       new THREE.TorusGeometry(11, 1.4, 8, 40),
@@ -734,6 +735,45 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
     }
+    // barco da frota de WestDocks (v10): casco, mastro, vela (negra se pirata)
+    function makeBarco(b) {
+      const g = new THREE.Group();
+      const pirata = b.tipo === 'pirata';
+      const corCasco = pirata ? 0x2a1e2e : 0x7c5230;
+      const corVela = pirata ? 0x1e1b26 : 0xf1f5f9;
+      const matCasco = new THREE.MeshLambertMaterial({ color: corCasco });
+      const matVela = new THREE.MeshLambertMaterial({ color: corVela, emissive: corVela, emissiveIntensity: 0.08 });
+      const matMastro = new THREE.MeshLambertMaterial({ color: 0x5c3a1e });
+      const casco = new THREE.Mesh(new THREE.CylinderGeometry(1, 2.6, 10, 3), matCasco);
+      casco.rotation.z = -Math.PI / 2; casco.scale.set(1, 1, 0.6);
+      casco.position.y = 1.4; casco.castShadow = true; g.add(casco);
+      const borda = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.7, 3.2), matCasco);
+      borda.position.y = 2.6; g.add(borda);
+      const mastro = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 11, 6), matMastro);
+      mastro.position.y = 7.5; g.add(mastro);
+      const vela = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 6.4), matVela);
+      vela.position.set(0.12, 7.6, 0); vela.rotation.y = Math.PI / 2;
+      vela.userData.kind = 'vela'; g.add(vela);
+      const bandeira = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2, 1.3),
+        new THREE.MeshBasicMaterial({ color: pirata ? 0x111114 : 0x0e7490, side: THREE.DoubleSide })
+      );
+      bandeira.position.set(0, 13.4, 0);
+      g.add(bandeira);
+      if (b.tipo === 'pesca') {
+        // rede na popa
+        const rede = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 2.6), new THREE.MeshLambertMaterial({ color: 0x9a7b4f }));
+        rede.position.set(-5.4, 2.4, 0); g.add(rede);
+      }
+      if (pirata) {
+        // farol de nível dos piratas: luzinha vermelha
+        const luz = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        luz.position.set(0, 13.4, 0); g.add(luz);
+      }
+      g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      return g;
+    }
+
     function makeLamp(x, z) {
       const g = new THREE.Group();
       const pole = new THREE.Mesh(
@@ -754,7 +794,10 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       [...terrainGroup.children].forEach(ch => { disposeDeep(ch); terrainGroup.remove(ch); });
       waters.length = 0;
       lamps.length = 0;
+      boatMap.forEach(g => { disposeDeep(g); terrainGroup.remove(g); });
+      boatMap.clear();
       const w = D.w, h = D.h;
+      const WD = (mundo.westdocks && mundo.westdocks.anexado) ? mundo.westdocks : null;
       const NAT = C.natureza || {}; // densidades/relevo vêm da configuração (fonte de verdade)
       // chão base — verde profundo em vez de grelha navy (menos quadrado, mais natureza)
       groundMesh = new THREE.Mesh(
@@ -925,6 +968,69 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           terrainGroup.add(flor);
         }
       });
+      /* ---------- v10: Reino de WestDocks — ilha, mar e costa ---------- */
+      if (WD) {
+        const marY0 = (WD.mar.y0 != null) ? WD.mar.y0 : 330;
+        const marY1 = marY0 + ((WD.mar.altura != null) ? WD.mar.altura : 150);
+        // Mar de West: água animada com ondas (entra na lista `waters`)
+        const marGeo = new THREE.PlaneGeometry(w, marY1 - marY0, 26, 10);
+        const mar = new THREE.Mesh(
+          marGeo,
+          new THREE.MeshLambertMaterial({ color: 0x14507e, transparent: true, opacity: 0.92, emissive: 0x06203f })
+        );
+        mar.rotation.x = -Math.PI / 2;
+        mar.position.set(w / 2, 0.05, (marY0 + marY1) / 2);
+        mar.userData.base = marGeo.attributes.position.array.slice();
+        terrainGroup.add(mar);
+        waters.push(mar);
+        // costa da ilha: terra clara entre a ponte e as docas
+        const costa = new THREE.Mesh(
+          new THREE.PlaneGeometry(w - 640 + 6, marY0 - 40),
+          new THREE.MeshLambertMaterial({ color: 0x3d6b35 })
+        );
+        costa.rotation.x = -Math.PI / 2;
+        costa.receiveShadow = true;
+        costa.position.set((640 + w) / 2, 0.02, (marY0 - 40) / 2);
+        terrainGroup.add(costa);
+        // palmeiras ao longo da costa (3 por registo determinístico)
+        const randWd = prng(998877);
+        for (let pi = 0; pi < 9; pi++) {
+          const px = 660 + randWd() * (w - 680);
+          const pz = marY0 - 14 - randWd() * 26;
+          const tronco = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 10, 6), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }));
+          tronco.position.set(px, 5, pz); tronco.rotation.z = (randWd() - 0.5) * 0.3; tronco.castShadow = true;
+          terrainGroup.add(tronco);
+          for (let f = 0; f < 5; f++) {
+            const folha = new THREE.Mesh(new THREE.ConeGeometry(0.9, 5.4, 4), new THREE.MeshLambertMaterial({ color: 0x2d8a4e }));
+            folha.position.set(px, 10.4, pz);
+            folha.rotation.z = 0.7 + f * (Math.PI * 2 / 5);
+            folha.rotation.x = Math.PI / 2.6;
+            folha.castShadow = true;
+            terrainGroup.add(folha);
+          }
+        }
+        // Ponte do Leste: tabuleiro + pilares (ligação ilha ↔ continente)
+        const pb = WD.ponte || { x: 640, y: 120, comprimento: 70 };
+        const tab = new THREE.Mesh(new THREE.BoxGeometry(pb.comprimento + 8, 1.6, 14), new THREE.MeshLambertMaterial({ color: 0x7c5230 }));
+        tab.position.set(pb.x + pb.comprimento / 2, 1.4, pb.y);
+        tab.receiveShadow = true; terrainGroup.add(tab);
+        for (let pP = 0; pP <= 2; pP++) {
+          const pilar = new THREE.Mesh(new THREE.BoxGeometry(2, 6, 2), new THREE.MeshLambertMaterial({ color: 0x5c3a1e }));
+          pilar.position.set(pb.x + pP * (pb.comprimento / 2), 3, pb.y);
+          terrainGroup.add(pilar);
+        }
+        // Cais: estrado de madeira que avança sobre o mar
+        const cais = WD.cais;
+        const estrado = new THREE.Mesh(new THREE.BoxGeometry(46, 1.4, 16), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }));
+        estrado.position.set(cais.x, 1.1, cais.y + 10);
+        estrado.receiveShadow = true; terrainGroup.add(estrado);
+        for (let st = 0; st < 4; st++) {
+          const est = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 7, 6), new THREE.MeshLambertMaterial({ color: 0x5c3a1e }));
+          est.position.set(cais.x - 18 + st * 12, 2.6, cais.y + 17);
+          terrainGroup.add(est);
+        }
+      }
+
       /* ---------- montanhas de fundo: horizonte com neve (v9.3) ---------- */
       /* ---------- aves de ambiente: águias/corujas/papagaios a voar (v9.3) ---------- */
       birds.forEach(b => { envGroup.remove(b); disposeDeep(b); });
@@ -1275,6 +1381,146 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         }
         addEmoji(def.emoji, bx, 28, bz, 15);
       }
+      // v10 — taberna/pub: fachada acolhedora, toldo, letreiro e bancos exteriores
+      function buildPub(bx, bz, def) {
+        const parede = new THREE.MeshLambertMaterial({ color: '#e8c9a0' });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#6b4226' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 16), parede);
+        corpo.position.set(bx, 6, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const telh = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 10.2, 24, 3), new THREE.MeshLambertMaterial({ color: '#7c2d12' }));
+        telh.rotation.z = Math.PI / 2; telh.scale.set(1, 1, 0.7);
+        telh.position.set(bx, 14.6, bz); telh.castShadow = true; terrainGroup.add(telh);
+        // toldo às riscas sobre a porta
+        for (let st = 0; st < 4; st++) {
+          const risca = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 6), new THREE.MeshLambertMaterial({ color: st % 2 ? '#f8fafc' : '#b91c1c' }));
+          risca.position.set(bx - 3.6 + st * 2.4, 8.6, bz + 9.6); terrainGroup.add(risca);
+        }
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(4.5, 6.5, 0.8), madeira);
+        porta.position.set(bx, 3.4, bz + 8.1); terrainGroup.add(porta);
+        // canecas/potinhos no peitoril
+        for (const cx of [-6, 6]) {
+          const caneca = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.6, 8), new THREE.MeshLambertMaterial({ color: '#fbbf24' }));
+          caneca.position.set(bx + cx, 8.4, bz + 8.2); terrainGroup.add(caneca);
+        }
+        // bancos exteriores
+        for (const bxs of [-7, 7]) {
+          const banco = new THREE.Mesh(new THREE.BoxGeometry(4, 1.2, 1.6), madeira);
+          banco.position.set(bx + bxs, 1.2, bz + 11); terrainGroup.add(banco);
+        }
+        addEmoji(def.emoji, bx, 21, bz, 14);
+      }
+      // v10 — loja do porto: montra ampla, toldo ciano, caixotes à porta
+      function buildLoja(bx, bz, def) {
+        const parede = new THREE.MeshLambertMaterial({ color: '#cbe7ee' });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#5c3a1e' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(18, 10, 14), parede);
+        corpo.position.set(bx, 5, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const telh = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 8.6, 20, 3), new THREE.MeshLambertMaterial({ color: '#0e7490' }));
+        telh.rotation.z = Math.PI / 2; telh.scale.set(1, 1, 0.72);
+        telh.position.set(bx, 11.8, bz); telh.castShadow = true; terrainGroup.add(telh);
+        const montra = new THREE.Mesh(new THREE.BoxGeometry(9, 4.4, 0.7), new THREE.MeshLambertMaterial({ color: '#a5f3fc', emissive: '#22d3ee', emissiveIntensity: 0.25 }));
+        montra.position.set(bx, 4.4, bz + 7.1); terrainGroup.add(montra);
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(3.4, 6, 0.8), madeira);
+        porta.position.set(bx + 5.5, 3, bz + 7.1); terrainGroup.add(porta);
+        for (const cxs of [-6, -3.4]) {
+          const caixote = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2, 2.2), madeira);
+          caixote.position.set(bx + cxs, 1, bz + 10); caixote.castShadow = true; terrainGroup.add(caixote);
+        }
+        addEmoji(def.emoji, bx, 17, bz, 13);
+      }
+      // v10 — docas reais: armazém de pedra com guindaste e pilhas de contentores
+      function buildDocas(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#8f8577' });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#5c3a1e' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(26, 13, 18), pedra);
+        corpo.position.set(bx, 6.5, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const telh = new THREE.Mesh(new THREE.BoxGeometry(27.5, 1.2, 19.5), new THREE.MeshLambertMaterial({ color: '#3f3f46' }));
+        telh.position.set(bx, 13.6, bz); terrainGroup.add(telh);
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(7, 8.5, 0.9), madeira);
+        porta.position.set(bx, 4.2, bz + 9.1); terrainGroup.add(porta);
+        // guindaste do porto
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2, 8, 8), new THREE.MeshLambertMaterial({ color: '#f59e0b' }));
+        base.position.set(bx + 17, 4, bz + 2); base.castShadow = true; terrainGroup.add(base);
+        const braco = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 13), new THREE.MeshLambertMaterial({ color: '#d97706' }));
+        braco.position.set(bx + 17, 8.6, bz - 4); braco.castShadow = true; terrainGroup.add(braco);
+        const gancho = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3.4, 5), new THREE.MeshLambertMaterial({ color: '#334155' }));
+        gancho.position.set(bx + 17, 6.4, bz - 9); terrainGroup.add(gancho);
+        // contentores empilhados
+        const coresCt = [0x1d4ed8, 0xb91c1c, 0x15803d];
+        for (let ct = 0; ct < 3; ct++) {
+          const ct1 = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 3), new THREE.MeshLambertMaterial({ color: coresCt[ct] }));
+          ct1.position.set(bx - 16 + ct * 7.4, 1.3, bz + 12); ct1.castShadow = true; terrainGroup.add(ct1);
+          if (ct !== 1) {
+            const ct2 = ct1.clone(); ct2.position.y = 3.9; terrainGroup.add(ct2);
+          }
+        }
+        addEmoji(def.emoji, bx, 22, bz, 15);
+      }
+      // v10 — farol: torre às riscas com luz rotativa (animada no frame loop)
+      function buildFarol(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#f1f5f9' });
+        const vermelho = new THREE.MeshLambertMaterial({ color: '#dc2626' });
+        for (let s = 0; s < 5; s++) {
+          const faixa = new THREE.Mesh(new THREE.CylinderGeometry(3.4 - s * 0.42, 3.8 - s * 0.42, 5.6, 12), s % 2 ? vermelho : pedra);
+          faixa.position.set(bx, 2.8 + s * 5.6, bz); faixa.castShadow = true; terrainGroup.add(faixa);
+        }
+        const lanterna = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.2, 2.2, 3.4, 10),
+          new THREE.MeshLambertMaterial({ color: '#fde68a', emissive: '#fbbf24', emissiveIntensity: 0.9 })
+        );
+        lanterna.position.set(bx, 30.6, bz);
+        lanterna.userData.kind = 'farol-luz'; // roda no frame loop
+        terrainGroup.add(lanterna);
+        const cupula = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#1e293b' }));
+        cupula.position.set(bx, 32.3, bz); terrainGroup.add(cupula);
+        // rochedo base
+        const rocha = new THREE.Mesh(new THREE.DodecahedronGeometry(5.4), new THREE.MeshLambertMaterial({ color: '#64748b' }));
+        rocha.position.set(bx, 1.2, bz); rocha.castShadow = true; terrainGroup.add(rocha);
+        addEmoji(def.emoji, bx, 40, bz, 14);
+      }
+      // v10 — caserna: forte azul com ameias e bandeira da guarda
+      function buildCaserna(bx, bz, def) {
+        const pedra = new THREE.MeshLambertMaterial({ color: '#cbd5e1' });
+        const azul = new THREE.MeshLambertMaterial({ color: '#1e40af' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(20, 11, 16), pedra);
+        corpo.position.set(bx, 5.5, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const telh = new THREE.Mesh(new THREE.BoxGeometry(21.4, 1.2, 17.4), azul);
+        telh.position.set(bx, 11.6, bz); terrainGroup.add(telh);
+        // ameias
+        for (let am = 0; am < 5; am++) {
+          const ameia = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), pedra);
+          ameia.position.set(bx - 8 + am * 4, 13.2, bz); terrainGroup.add(ameia);
+        }
+        // torre com bandeira
+        const torre = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, 15, 10), azul);
+        torre.position.set(bx - 12, 7.5, bz); torre.castShadow = true; terrainGroup.add(torre);
+        const mastro = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 7, 6), new THREE.MeshLambertMaterial({ color: '#64748b' }));
+        mastro.position.set(bx - 12, 18.4, bz); terrainGroup.add(mastro);
+        const bandeira = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.4), new THREE.MeshBasicMaterial({ color: '#2563eb', side: THREE.DoubleSide }));
+        bandeira.position.set(bx - 9.8, 20.8, bz);
+        bandeira.userData.kind = 'bandeira-caserna';
+        terrainGroup.add(bandeira);
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(4.4, 6.4, 0.8), new THREE.MeshLambertMaterial({ color: '#172554' }));
+        porta.position.set(bx, 3.2, bz + 8.1); terrainGroup.add(porta);
+        addEmoji(def.emoji, bx, 26, bz, 14);
+      }
+      // v10 — casa do porto: casinha colorida com varanda
+      function buildCasa(bx, bz, def) {
+        const tons = ['#fde8d7', '#d7e8fd', '#e8fdd7', '#fdd7e8'];
+        const h = Math.abs(Math.round(bx * 13.7 + bz * 7.3));
+        const parede = new THREE.MeshLambertMaterial({ color: tons[h % tons.length] });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#7c5230' });
+        const corpo = new THREE.Mesh(new THREE.BoxGeometry(13, 8.5, 11), parede);
+        corpo.position.set(bx, 4.2, bz); corpo.castShadow = true; terrainGroup.add(corpo);
+        const telh = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 7.6, 15, 3), new THREE.MeshLambertMaterial({ color: '#b45309' }));
+        telh.rotation.z = Math.PI / 2; telh.scale.set(1, 1, 0.66);
+        telh.position.set(bx, 10.4, bz); telh.castShadow = true; terrainGroup.add(telh);
+        const porta = new THREE.Mesh(new THREE.BoxGeometry(2.6, 4.6, 0.6), madeira);
+        porta.position.set(bx, 2.3, bz + 5.6); terrainGroup.add(porta);
+        const janela = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 0.6), new THREE.MeshLambertMaterial({ color: '#fde68a', emissive: '#f59e0b', emissiveIntensity: 0.2 }));
+        janela.position.set(bx + 3.8, 5, bz + 5.6); terrainGroup.add(janela);
+        addEmoji(def.emoji, bx, 16, bz, 10);
+      }
       // fazenda: rancho rural — casa com telhado vermelho, silo, cercas e fardos de feno (v9.3)
       function buildFazenda(bx, bz, def) {
         const parede = new THREE.MeshLambertMaterial({ color: '#fde8d7' });
@@ -1311,10 +1557,13 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         addEmoji(def.emoji, bx, 26, bz, 16);
       }
       // restantes: casa com telhado (estilo geral)
-      mundo.construcoes.forEach((c, i) => {
+      // v10: edifícios de WestDocks têm posição própria (wx/wy); os restantes ficam na grelha
+      const buildsWd = mundo.construcoes.filter(c => c.wx != null);
+      const buildsBase = mundo.construcoes.filter(c => c.wx == null);
+      buildsBase.forEach((c, i) => {
         const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
         const bx = 44 + (i % 8) * 68;
-        const bz = 30;
+        const bz = 30 + Math.floor(i / 8) * 90;
         if (c.tipo === 'mercado') { buildMercado(bx, bz, def); return; }
         if (c.tipo === 'banco') { buildBanco(bx, bz, def); return; }
         if (c.tipo === 'hospital') { buildHospital(bx, bz, def); return; }
@@ -1344,6 +1593,23 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         telhado.rotation.y = Math.PI / 4;
         terrainGroup.add(telhado);
         addEmoji(def.emoji, bx, altura + 16, bz);
+      });
+      // v10: edifícios do reino de WestDocks nas suas posições na ilha
+      buildsWd.forEach(c => {
+        const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
+        const bx = c.wx, bz = c.wy;
+        if (c.tipo === 'pub') { buildPub(bx, bz, def); return; }
+        if (c.tipo === 'loja') { buildLoja(bx, bz, def); return; }
+        if (c.tipo === 'docas') { buildDocas(bx, bz, def); return; }
+        if (c.tipo === 'farol') { buildFarol(bx, bz, def); return; }
+        if (c.tipo === 'caserna') { buildCaserna(bx, bz, def); return; }
+        if (c.tipo === 'casa') { buildCasa(bx, bz, def); return; }
+        // fallback: caixa com telhado
+        const altura = 14;
+        const corBase = new THREE.Color(def.cor);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(20, altura, 20), new THREE.MeshLambertMaterial({ color: corBase, emissive: corBase.clone().multiplyScalar(0.22) }));
+        box.position.set(bx, altura / 2, bz); box.castShadow = true; terrainGroup.add(box);
+        addEmoji(def.emoji, bx, altura + 12, bz);
       });
       // luz direcional centrada no mundo (rasante → sombras longas e visíveis)
       dir.position.set(w / 2, 470, h / 2 - 460);
@@ -1527,6 +1793,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         lastChunks = -1; // força rebuild
         agentsMap.forEach(g => { disposeDeep(g); agentsGroup.remove(g); });
         agentsMap.clear();
+        boatMap.forEach(g => { disposeDeep(g); terrainGroup.remove(g); });
+        boatMap.clear();
         faunaMap.forEach(g => { disposeDeep(g); faunaGroup.remove(g); });
         faunaMap.clear();
         itemsMap.forEach(g => { disposeDeep(g); itemsGroup.remove(g); });
@@ -1585,11 +1853,30 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           ch.position.y = 21 + Math.sin(t * 2.6) * 1.2; // flutua
           ch.material.emissiveIntensity = 0.6 + Math.abs(Math.sin(t * 2.6)) * 0.7; // pulsa
         }
+        else if (ud.kind === 'farol-luz') ch.rotation.y = t * 0.9; // v10: luz do farol gira
+        else if (ud.kind === 'bandeira-caserna') ch.rotation.y = Math.sin(t * 2.2) * 0.35; // v10: bandeira acena
       });
       clouds.forEach(c => {
         c.g.position.x += c.speed * dt;
         if (c.g.position.x > Dd.w + 240) c.g.position.x = -240;
       });
+      // v10: frota do Mar de West — barcos balançam nas ondas e viram para o rumo
+      {
+        const vivos = new Set();
+        (mundo.barcos || []).forEach(b => {
+          vivos.add(b.id);
+          let g = boatMap.get(b.id);
+          if (!g) { g = makeBarco(b); boatMap.set(b.id, g); terrainGroup.add(g); }
+          g.position.set(b.x, Math.sin(t * 1.4 + b.fase) * 0.5, b.y);
+          g.rotation.y = -b.rumo + Math.PI / 2;
+          g.rotation.z = Math.sin(t * 1.1 + b.fase) * 0.06; // rolamento nas ondas
+          const vela = g.children.find(ch => ch.userData && ch.userData.kind === 'vela');
+          if (vela) vela.rotation.x = Math.sin(t * 2 + b.fase) * 0.08;
+        });
+        for (const [id, g] of boatMap) {
+          if (!vivos.has(id)) { disposeDeep(g); terrainGroup.remove(g); boatMap.delete(id); }
+        }
+      }
       // aves de ambiente: círculos amplos no céu, asas a bater (v9.3)
       birds.forEach(b => {
         const U = b.userData;

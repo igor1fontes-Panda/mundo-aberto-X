@@ -185,7 +185,7 @@ export default function App() {
   };
   const comprar = (key) => {
     const r = E.jogadorComprar(mundoRef.current, key);
-    mostrarToast(r.ok ? `Compraste: ${CFG.ferramentas[key].nome}` : r.erro, !r.ok);
+    mostrarToast(r.ok ? `Compraste: ${CFG.ferramentas[key].nome}${r.preco != null && r.preco !== CFG.ferramentas[key].custo ? ` (−15% loja do porto)` : ''}` : r.erro, !r.ok);
     repintar();
   };
   const ofertar = (quantia) => {
@@ -244,6 +244,24 @@ export default function App() {
     const r = jogador ? E.jogadorExpandirMapa(mundoRef.current) : { ok: false, erro: 'Entra como Criador primeiro' };
     mostrarToast(r.ok ? `Território anexado: ${r.chunk}` : r.erro, !r.ok);
     repintar();
+  };
+  // ----- v10: Reino de WestDocks -----
+  const anexarWd = () => {
+    const r = jogador ? E.jogadorAnexarWestDocks(mundoRef.current) : { ok: false, erro: 'Entra como Criador primeiro' };
+    mostrarToast(r.ok ? '⚓ Reino de WestDocks anexado — docas, taberna, loja e farol!' : r.erro, !r.ok);
+    if (r.ok) { setSelecionadoId(null); setTab('mundo'); setVista('jogo'); }
+    repintar();
+  };
+  const navegar = () => {
+    const r = E.jogadorNavegar(mundoRef.current);
+    mostrarToast(r.ok ? r.msg : r.erro, !r.ok);
+    repintar();
+  };
+  const [npcSelecionado, setNpcSelecionado] = useState(null);
+  const falarComNpc = (np) => {
+    setNpcSelecionado(np.id);
+    const r = E.falarNpc(mundoRef.current, np.id);
+    mostrarToast(r.ok ? `${r.nome}: “${r.texto}”` : r.erro, !r.ok);
   };
   const aceitarMissao = (id) => {
     const r = E.aceitarMissao(mundoRef.current, id);
@@ -598,6 +616,21 @@ export default function App() {
                         className="px-3 py-2 rounded-xl text-xs font-bold" style={{ background: '#064e3b', color: '#a7f3d0' }}>✨ Interagir</button>
                     </>
                   )}
+                  {jogador && !m.westdocks && (
+                    <button onClick={anexarWd}
+                      title="Anexar o Reino de WestDocks: docas, barcos, taberna e farol"
+                      className="px-3 py-2 rounded-xl text-xs font-black text-slate-900"
+                      style={{ background: 'linear-gradient(135deg, #f59e0b, #0891b2)' }}>
+                      ⚓ Reino WestDocks ({CFG.westdocks.custoAnexar}🪙)
+                    </button>
+                  )}
+                  {jogador && m.westdocks && (
+                    <button onClick={navegar} title="Embarcar/desembarcar do ferri (cais ↔ Ponte do Leste)"
+                      className="px-3 py-2 rounded-xl text-xs font-black text-slate-900"
+                      style={{ background: 'linear-gradient(135deg, #0891b2, #2563eb)' }}>
+                      ⛵ Navegar
+                    </button>
+                  )}
                   {jogador && (
                     <button onClick={expandirMundo}
                       className="px-3 py-2 rounded-xl text-xs font-black text-slate-900"
@@ -684,18 +717,47 @@ export default function App() {
                 <h3 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: CORES.ouro }}>🧍 Vida do mundo</h3>
                 <p className="text-[10px] text-slate-500 mb-2">Não são agentes — não falam Lume, não pagam impostos. Só vivem as suas tarefas.</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {(m.npcs || []).map(np => (
-                    <div key={np.id}
-                      title={np.tarefa}
-                      className="px-2 py-1 rounded-xl border border-slate-800 text-[11px] font-semibold select-none"
-                      style={{ background: '#020617aa', color: np.cor || '#cbd5e1' }}>
-                      {np.emoji} {np.nome}
-                      <span className="text-[9px] ml-1" style={{ color: '#64748b' }}>· {np.tarefa}</span>
-                      {np.pausa > 0 && <span className="text-[9px] ml-1" style={{ color: '#475569' }}>(ocupado)</span>}
-                    </div>
-                  ))}
+                  {(m.npcs || []).map(np => {
+                    const temFalas = !!((((CFG.npcs || {}).tipos || {})[np.tipo] || {}).falas);
+                    return (
+                      <button key={np.id}
+                        onClick={() => temFalas && falarComNpc(np)}
+                        title={temFalas ? 'Falar com ' + np.nome : np.tarefa}
+                        className={'px-2 py-1 rounded-xl border text-[11px] font-semibold transition-all ' + (temFalas ? 'hover:scale-105 cursor-pointer' : 'cursor-default select-none')}
+                        style={{ background: '#020617aa', color: np.cor || '#cbd5e1',
+                          borderColor: npcSelecionado === np.id ? (np.cor || '#94a3b8') : '#1e293b' }}>
+                        {np.emoji} {np.nome}
+                        <span className="text-[9px] ml-1" style={{ color: '#64748b' }}>· {np.tarefa}</span>
+                        {np.pausa > 0 && <span className="text-[9px] ml-1" style={{ color: '#475569' }}>(ocupado)</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* v10: Frota do Mar de West + Reino de WestDocks */}
+              {m.westdocks && (
+                <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
+                  <h3 className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: CORES.ouro }}>⚓ Reino de WestDocks</h3>
+                  <p className="text-[10px] text-slate-500 mb-2">
+                    Cidade-irmã à beira-mar · fundada no tick {m.westdocks.fundadoEm} · ligada por ponte a leste e ferri no cais.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(m.barcos || []).map(b => (
+                      <div key={b.id} className="px-2 py-1 rounded-xl border border-slate-800 text-[11px] font-semibold select-none" style={{ background: '#020617aa', color: b.tipo === 'pirata' ? '#f87171' : b.tipo === 'pesca' ? '#7dd3fc' : '#fde68a' }}>
+                        {b.tipo === 'pirata' ? '☠' : b.tipo === 'pesca' ? '🎣' : '⛵'} {b.nome}
+                        <span className="text-[9px] ml-1" style={{ color: '#64748b' }}>· {b.tipo === 'pesca' ? 'carga ' + Math.round(b.carga || 0) : b.tipo === 'ferri' ? (b.passageiro ? 'com Criador' : 'no cais') : 'ao largo'}</span>
+                      </div>
+                    ))}
+                    {(m.barcos || []).length === 0 && <span className="text-[10px] text-slate-600">Mar calmo — sem velas à vista.</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    🏪 Loja do porto: {m.construcoes.some(c => c.tipo === 'loja') ? 'ferramentas −15% 🪙' : 'ainda não construída'} ·
+                    🗼 Farol: {m.construcoes.some(c => c.tipo === 'farol') ? 'pesca +30%' : 'apagado'} ·
+                    🛡️ Caserna: {m.construcoes.some(c => c.tipo === 'caserna') ? 'piratas afastados' : 'guarda de folga'}
+                  </div>
+                </div>
+              )}
 
               {/* Território */}
               <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>

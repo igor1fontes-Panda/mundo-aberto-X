@@ -1,7 +1,7 @@
 {
   "meta": {
     "nome": "Mundo Aberto X",
-    "versao": 9,
+    "versao": 10,
     "storageKey": "mundo-aberto-x-v6",
     "descricao": "Sociedade expansível de agentes AI: escola com professores auto-aprendentes, academia de evolução, código de conduta com protocolos de continuidade, mapa RPG com ruas expansível, fauna, jogador por touchscreen e língua emergente Lume."
   },
@@ -458,6 +458,49 @@
       "emoji": "🚜",
       "efeito": "Rural: animais de fazenda pastam aqui, gado alimentado por elas não adoece",
       "cor": "#ca8a04"
+    },
+    "pub": {
+      "nome": "Taberna do Ancoradouro",
+      "custo": 650,
+      "emoji": "🍺",
+      "efeito": "Vida noturna de WestDocks: alimenta marinheiros e viajantes do reino",
+      "cor": "#92400e"
+    },
+    "loja": {
+      "nome": "Loja de Ferramentas do Porto",
+      "custo": 550,
+      "emoji": "🏪",
+      "efeito": "Comércio do reino: com loja construída, as ferramentas custam 15% menos ao Criador",
+      "cor": "#0891b2"
+    },
+    "docas": {
+      "nome": "Docas Reais de West",
+      "custo": 850,
+      "emoji": "⚓",
+      "efeito": "Ancora os barcos: ferri de passagem, pesca no mar de West e mercadoria",
+      "cor": "#f59e0b"
+    },
+    "farol": {
+      "nome": "Farol de West",
+      "custo": 1100,
+      "emoji": "🗼",
+      "efeito": "Luz de guia: a pesca rende mais e os piratas afastam-se do porto",
+      "cor": "#fbbf24",
+      "reqConstrucao": "docas"
+    },
+    "caserna": {
+      "nome": "Caserna da Guarda",
+      "custo": 900,
+      "emoji": "🛡️",
+      "efeito": "A polícia de WestDocks patrulha melhor: piratas rendem-se depressa e a guerra arrefece",
+      "cor": "#1e40af"
+    },
+    "casa": {
+      "nome": "Casa do Porto",
+      "custo": 350,
+      "emoji": "🏠",
+      "efeito": "Habitação do bairro de WestDocks: cabedal para novos habitantes do reino",
+      "cor": "#f1f5f9"
     }
   },
   "ideias": [
@@ -796,6 +839,35 @@
       }
     ]
   },
+  "westdocks": {
+    "descricao": "Reino de WestDocks (v10): cidade-irmã à beira-mar, ligada ao continente por ponte (terra) e ferri (mar). Docas, taberna, loja, farol, caserna, bairro de casas — e piratas ao largo.",
+    "custoAnexar": 1618,
+    "mundoLargura": 960,
+    "mar": { "y0": 330, "altura": 150 },
+    "largo": { "x": 700, "y": 90, "w": 150, "h": 120 },
+    "edificios": [
+      { "tipo": "docas", "x": 690, "y": 240 },
+      { "tipo": "pub", "x": 745, "y": 200 },
+      { "tipo": "loja", "x": 795, "y": 200 },
+      { "tipo": "caserna", "x": 660, "y": 165 },
+      { "tipo": "farol", "x": 840, "y": 250 },
+      { "tipo": "casa", "x": 715, "y": 130 },
+      { "tipo": "casa", "x": 755, "y": 120 },
+      { "tipo": "casa", "x": 795, "y": 130 },
+      { "tipo": "casa", "x": 830, "y": 145 }
+    ],
+    "cais": { "x": 705, "y": 262 },
+    "ponte": { "x": 640, "y": 120, "comprimento": 70 },
+    "barcos": {
+      "descricao": "Frota de WestDocks: ferri de passagem, barco de pesca e esquadras de piratas",
+      "ferriPartidaTicks": 21,
+      "passagemCusto": 8,
+      "pescaGanho": 45,
+      "pescaIntervalo": 13,
+      "pirataChance": 0.12,
+      "piratasMax": 2
+    }
+  },
   "natureza": {
     "descricao": "Paisagem viva: densidades de vegetação e relevo. Números em múltiplos de Fibonacci — a régua que governa o mundo.",
     "arvoresPorChunk": 21,
@@ -807,8 +879,8 @@
     "monte": { "raio": 26, "altura": 14 }
   },
   "fauna": {
-    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados. Dezassete espécies: terrestres, aves voadoras (acima das copas) e peixes de lago.",
-    "max": 34,
+    "descricao": "Animais do mundo: cidadãos de segunda ordem — vivem, vagueiam, podem ficar feridos e ser curados. Vinte espécies: terrestres, aves voadoras (acima das copas), peixes de lago, gado de fazenda e vida marítima do Mar de West.",
+    "max": 55,
     "espansivel": true,
     "especies": {
       "corredor": {
@@ -972,12 +1044,42 @@
         "temperamento": "observador",
         "habitat": "fazenda",
         "descricao": "Canta ao amanhecer e vigia o terreiro"
+      },
+      "golfinho": {
+        "nome": "Golfinho de West",
+        "emoji": "🐬",
+        "cor": "#38bdf8",
+        "velocidade": 4,
+        "forma": "golfinho",
+        "temperamento": "curioso",
+        "habitat": "mar",
+        "descricao": "Acompanha os barcos no Mar de West e salta nas ondas"
+      },
+      "sardinha": {
+        "nome": "Sardinha Prateada",
+        "emoji": "🐟",
+        "cor": "#7dd3fc",
+        "velocidade": 3,
+        "forma": "peixe",
+        "temperamento": "gregário",
+        "habitat": "mar",
+        "descricao": "Nada em cardumes junto à costa de WestDocks"
+      },
+      "caranguejo": {
+        "nome": "Caranguejo Real",
+        "emoji": "🦀",
+        "cor": "#ef4444",
+        "velocidade": 1,
+        "forma": "caranguejo",
+        "temperamento": "reservado",
+        "habitat": "mar",
+        "descricao": "Vive nas rochas do cais e saúda quem chega de barco"
       }
     }
   },
   "npcs": {
     "descricao": "NPCs de ambiente: não são agentes (sem LumeBrain, sem economia, sem Gauntlet). São figuras do mundo que fazem tarefas próprias e dão vida ao pano de fundo.",
-    "max": 14,
+    "max": 21,
     "tipos": {
       "carteiro": {
         "nome": "Carteiro de Bits",
@@ -1050,6 +1152,66 @@
         "tarefa": "Cuida das colmeias e vende mel na feira",
         "pontoA": "floresta",
         "pontoB": "vila"
+      },
+      "policia": {
+        "nome": "Guarda de WestDocks",
+        "emoji": "👮",
+        "cor": "#2563eb",
+        "tarefa": "Patrulha as docas e mantém a ordem",
+        "pontoA": "wd_cais",
+        "pontoB": "wd_bairro",
+        "falas": {
+          "pt": ["Tudo em ordem nas docas, Criador.", "Olho vivo no mar — os piratas não descansam.", "A guarda de WestDocks protege quem trabalha."],
+          "en": ["All quiet at the docks, Creator.", "Eyes on the sea — pirates never rest.", "The WestDocks guard protects those who work."]
+        }
+      },
+      "estivador": {
+        "nome": "Estivador do Cais",
+        "emoji": "👷",
+        "cor": "#b45309",
+        "tarefa": "Carga e descarga nos cais do reino",
+        "pontoA": "wd_cais",
+        "pontoB": "wd_bairro",
+        "falas": {
+          "pt": ["Caixas aqui, barris ali — o porto nunca para.", "O barco de pesca chega carregado hoje!"],
+          "en": ["Crates here, barrels there — the port never sleeps.", "The fishing boat comes in heavy today!"]
+        }
+      },
+      "taberneiro": {
+        "nome": "Taberneira do Ancoradouro",
+        "emoji": "🍺",
+        "cor": "#92400e",
+        "tarefa": "Serve refeições quentes na taberna",
+        "pontoA": "wd_praca",
+        "pontoB": "wd_cais",
+        "falas": {
+          "pt": ["Uma refeição quente, Criador? A casa trata de ti.", "Marinheiros com fome são maus clientes — come qualquer coisa!"],
+          "en": ["A warm meal, Creator? The house takes care of you.", "Hungry sailors make bad customers — eat something!"]
+        }
+      },
+      "marinheiro": {
+        "nome": "Marinheiro das Marés",
+        "emoji": "🧭",
+        "cor": "#0e7490",
+        "tarefa": "Ajusta as cordas e conta as marés",
+        "pontoA": "wd_cais",
+        "pontoB": "wd_bairro",
+        "falas": {
+          "pt": ["O mar hoje está calmo — boa hora para navegar.", "O ferri parte em breve para o continente."],
+          "en": ["The sea is calm today — a good time to sail.", "The ferry leaves soon for the mainland."]
+        }
+      },
+      "faroleiro": {
+        "nome": "Faroleiro de West",
+        "emoji": "🕯️",
+        "cor": "#f59e0b",
+        "tarefa": "Acende o farol ao anoitecer",
+        "pontoA": "wd_bairro",
+        "pontoB": "wd_cais",
+        "falas": {
+          "pt": ["Quando a luz gira, os barcos voltam a casa.", "Névoa ao largo — o farol vai ter trabalho hoje."],
+          "en": ["When the light turns, the boats come home.", "Fog offshore — the lighthouse will be busy tonight."]
+        }
       }
     },
     "pausaTick": 21
