@@ -193,7 +193,9 @@ teste('v6: sucessão — espírito lega moedas e saber', () => {
 
 teste('v6: fauna nasce, vagueia e reproduz-se por Fibonacci', () => {
   const m = E.criarMundo(CFG);
-  expect(m.fauna && m.fauna.length === 6, 'fauna inicial devia ser 6');
+  expect(m.fauna && m.fauna.length === 15, 'fauna inicial devia ser 15 (6 terra + 3 aves + 2 peixes + 4 fazenda)');
+  const habitats = new Set(m.fauna.map(an => an.habitat || 'terra'));
+  expect(habitats.has('ar') && habitats.has('agua'), 'aves e peixes presentes desde o início');
   const antes = m.fauna.length;
   for (let i = 0; i < 14; i++) E.tick(m); // fib(7)=13 → nasce 1
   expect(m.fauna.length > antes, 'fauna devia crescer a cada fib(7)');

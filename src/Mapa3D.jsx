@@ -301,6 +301,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
     let lastBuilds = -1;
     let envBuilt = false;
     const waters = [];      // lagos animados
+    const birds = [];       // aves voadoras do ambiente (águia/coruja/papagaio)
     const lamps = [];       // postes (acendem à noite)
     const clouds = [];      // nuvens à deriva
     let stars = null;
@@ -583,6 +584,56 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       } else if (an.forma === 'ave') {
         const bico = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.9, 6), new THREE.MeshLambertMaterial({ color: 0xf59e0b }));
         bico.rotation.x = Math.PI / 2; bico.position.set(0, 8.1, 5.3); g.add(bico);
+      } else if (an.forma === 'aguia' || an.forma === 'coruja' || an.forma === 'papagaio') {
+        // aves voadoras: corpo aerodinâmico, bico grande, cauda em leme (v9.3)
+        const bico = new THREE.Mesh(new THREE.ConeGeometry(0.9, an.forma === 'papagaio' ? 2.4 : 1.8, 6),
+          new THREE.MeshLambertMaterial({ color: an.forma === 'papagaio' ? 0xf97316 : 0xf59e0b }));
+        bico.rotation.x = Math.PI / 2; bico.position.set(0, 7.4, 5.6); g.add(bico);
+        const cauda = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 4.2), mat);
+        cauda.position.set(0, 4.6, -6.2); cauda.rotation.x = 0.22; g.add(cauda);
+        extras.tail = cauda;
+        const coroa = new THREE.Mesh(new THREE.SphereGeometry(1.0, 8, 8), mat);
+        coroa.position.set(0, 10.9, 2.0); g.add(coroa);
+        const asaGeoAve = new THREE.BoxGeometry(7.5, 0.35, 3.2);
+        const wLA = new THREE.Mesh(asaGeoAve, mat); wLA.position.set(-4.2, 8.6, 0); wLA.rotation.z = 0.3; g.add(wLA);
+        const wRA = new THREE.Mesh(asaGeoAve, mat); wRA.position.set(4.2, 8.6, 0); wRA.rotation.z = -0.3; g.add(wRA);
+        extras.wingL = wLA; extras.wingR = wRA;
+      } else if (an.forma === 'peixe') {
+        // peixe de lago: corpo fusiforme, cauda em V, barbatana dorsal (v9.3)
+        body.scale.set(0.62, 0.72, 1.75);
+        const caudaP = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.2, 4), mat);
+        caudaP.rotation.x = -Math.PI / 2; caudaP.scale.set(1, 1, 0.5);
+        caudaP.position.set(0, 4.4, -5.8); g.add(caudaP);
+        const dorsal = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 4), mat);
+        dorsal.position.set(0, 8.0, -0.6); g.add(dorsal);
+        extras.dorsal = dorsal;
+        head.visible = false; // peixe não tem cabeça de mamífero
+      } else if (an.forma === 'vaca' || an.forma === 'cavalo' || an.forma === 'ovelha' || an.forma === 'galo') {
+        // gado: corpo maior com manchas/pelos, focinho claro (v9.3)
+        body.scale.set(1.25, 1.05, 1.6);
+        if (an.forma === 'vaca') {
+          const mancha = new THREE.Mesh(new THREE.SphereGeometry(1.9, 8, 7), new THREE.MeshLambertMaterial({ color: 0x1e1b2e }));
+          mancha.scale.set(1.2, 0.7, 1.5); mancha.position.set(1.6, 5.6, 2.2); g.add(mancha);
+          const mancha2 = mancha.clone(); mancha2.position.set(-2.0, 4.6, -2.4); mancha2.scale.setScalar(0.7); g.add(mancha2);
+        }
+        if (an.forma === 'cavalo') {
+          const juba = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.6, 4.4), new THREE.MeshLambertMaterial({ color: 0x1e1b2e }));
+          juba.position.set(0, 9.6, 0.6); g.add(juba);
+          body.scale.set(1.05, 1.05, 1.85); // alongado
+        }
+        if (an.forma === 'ovelha') {
+          const la = new THREE.Mesh(new THREE.SphereGeometry(4.4, 10, 8), new THREE.MeshLambertMaterial({ color: 0xfafaf9 }));
+          la.scale.set(1.2, 1.0, 1.4); la.position.y = 4.8; g.add(la);
+        }
+        if (an.forma === 'galo') {
+          const crista = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.4, 2.6), new THREE.MeshLambertMaterial({ color: 0xdc2626 }));
+          crista.position.set(0, 11.0, 2.2); g.add(crista);
+          const penaC = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4.4, 6), mat);
+          penaC.position.set(0, 6.0, -5.6); penaC.rotation.x = 0.9; g.add(penaC);
+        }
+        const focinho = new THREE.Mesh(new THREE.SphereGeometry(1.3, 8, 7),
+          new THREE.MeshLambertMaterial({ color: an.forma === 'galo' ? 0xf59e0b : 0xe7d7c9 }));
+        focinho.scale.set(1, 0.72, 1); focinho.position.set(0, 7.8, 4.6); g.add(focinho);
       } else if (an.forma === 'axolote') {
         // guelros rosa salientes
         for (const sx of [-2.6, 2.6]) {
@@ -591,6 +642,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         }
       }
       g.userData.forma = an.forma || null;
+      g.userData.habitat = an.habitat || 'terra';
       g.userData.anim = { head, tail, body, ...extras };
       g.traverse(o => { if (o.isMesh) o.castShadow = true; });
       return g;
@@ -624,6 +676,64 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       g.rotation.y = rand() * Math.PI * 2;
       return g;
     }
+    // aves de ambiente (v9.3): silhueta leve — corpo + asas a bater + cauda
+    function makeBird(rand, i) {
+      const g = new THREE.Group();
+      const esp = i % 4; // 0 águia · 1 corvo · 2 coruja · 3 papagaio
+      const cores = [0x8a6432, 0x1e1b26, 0x92766b, 0x22c55e];
+      const tam = esp === 0 ? 1.5 : esp === 1 ? 0.95 : 1.05;
+      const mat = new THREE.MeshLambertMaterial({ color: cores[esp] });
+      const corpo = new THREE.Mesh(new THREE.SphereGeometry(1.6 * tam, 8, 7), mat);
+      corpo.scale.set(1.15, 0.85, 1.7);
+      g.add(corpo);
+      const cabeca = new THREE.Mesh(new THREE.SphereGeometry(0.95 * tam, 8, 7), mat);
+      cabeca.position.set(0, 0.85 * tam, 2.3 * tam);
+      g.add(cabeca);
+      const bico = new THREE.Mesh(
+        new THREE.ConeGeometry(esp === 3 ? 0.55 : 0.35, esp === 3 ? 1.4 : 0.9, 6),
+        new THREE.MeshLambertMaterial({ color: esp === 1 ? 0x64748b : 0xf59e0b })
+      );
+      bico.rotation.x = Math.PI / 2;
+      bico.position.set(0, 0.8 * tam, 3.4 * tam);
+      g.add(bico);
+      const asaGeo = new THREE.BoxGeometry(6.5 * tam, 0.18, 2.3 * tam);
+      const wL = new THREE.Mesh(asaGeo, mat); wL.position.set(-3.6 * tam, 0.4 * tam, 0); wL.rotation.z = 0.3; g.add(wL);
+      const wR = new THREE.Mesh(asaGeo, mat); wR.position.set(3.6 * tam, 0.4 * tam, 0); wR.rotation.z = -0.3; g.add(wR);
+      const cauda = new THREE.Mesh(new THREE.BoxGeometry(1.5 * tam, 0.15, 2.6 * tam), mat);
+      cauda.position.set(0, 0.25 * tam, -3.2 * tam);
+      g.add(cauda);
+      g.userData = { wingL: wL, wingR: wR, ang: (i / 8) * Math.PI * 2, h: 60 + (i % 3) * 22, r: 140 + (i % 4) * 55, speed: 0.12 + (i % 5) * 0.05 };
+      return g;
+    }
+    // carroça de tração animal (v9.3): caixa de madeira + rodas + canga
+    function makeCarroca() {
+      const g = new THREE.Group();
+      const madeira = new THREE.MeshLambertMaterial({ color: 0x7c5230 });
+      const caixa = new THREE.Mesh(new THREE.BoxGeometry(6.4, 3.4, 4.6), madeira);
+      caixa.position.y = 2.1; caixa.castShadow = true; g.add(caixa);
+      const carga = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.6, 3.8), new THREE.MeshLambertMaterial({ color: 0xc9a227 }));
+      carga.position.y = 4.4; g.add(carga);
+      const rodas = [];
+      const rodaGeo = new THREE.TorusGeometry(1.7, 0.42, 8, 16);
+      const raioGeo = new THREE.CylinderGeometry(0.14, 0.14, 4.6, 6);
+      for (const sx of [-3.0, 3.0]) {
+        for (const sz of [-1.4, 1.4]) {
+          const roda = new THREE.Mesh(rodaGeo, madeira);
+          roda.position.set(sx, 1.7, sz);
+          roda.rotation.y = Math.PI / 2;
+          const raio = new THREE.Mesh(raioGeo, madeira);
+          raio.rotation.z = Math.PI / 2;
+          roda.add(raio);
+          g.add(roda);
+          rodas.push(roda);
+        }
+      }
+      const canga = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 5.4, 6), madeira);
+      canga.rotation.x = Math.PI / 2; canga.position.set(0, 2.4, -3.8); g.add(canga);
+      g.userData.rodas = rodas;
+      g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      return g;
+    }
     function makeLamp(x, z) {
       const g = new THREE.Group();
       const pole = new THREE.Mesh(
@@ -645,6 +755,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
       waters.length = 0;
       lamps.length = 0;
       const w = D.w, h = D.h;
+      const NAT = C.natureza || {}; // densidades/relevo vêm da configuração (fonte de verdade)
       // chão base — verde profundo em vez de grelha navy (menos quadrado, mais natureza)
       groundMesh = new THREE.Mesh(
         new THREE.PlaneGeometry(w, h),
@@ -691,6 +802,8 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           agua.userData.base = geo.attributes.position.array.slice();
           terrainGroup.add(agua);
           waters.push(agua);
+          if (!mundo.lagos) mundo.lagos = [];
+          mundo.lagos.push({ cx: lx + lw / 2, cz: lz + lh / 2, w: lw, h: lh });
           lagosFeitos++;
         }
         // zonas e ruas
@@ -728,9 +841,10 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             else if (!horizontal && d < offY + r.y + r.h - 8) terrainGroup.add(makeLamp(offX + r.x + r.w + 3, offY + d));
           }
         });
-        // árvores fora de zonas/ruas/lagos
+        // árvores fora de zonas/ruas/lagos — floresta densa (v9.3)
         let plantadas = 0;
-        for (let tent = 0; tent < 40 && plantadas < 12; tent++) {
+        const alvoArvores = NAT.arvoresPorChunk || 21;
+        for (let tent = 0; tent < alvoArvores * 3 + 10 && plantadas < alvoArvores; tent++) {
           const x = offX + 8 + rand() * (mapa.chunkLargura - 16);
           const z = offY + 8 + rand() * (mapa.chunkAltura - 16);
           const livre = zonas.every(zz => !rectContem(x, z, offX + zz.x, offY + zz.y, zz.w, zz.h, 6))
@@ -742,8 +856,24 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           terrainGroup.add(tr);
           plantadas++;
         }
+        // montes suaves (relevo decorativo fora de zonas/ruas/lagos)
+        for (let mi = 0; mi < (NAT.montesPorChunk || 2); mi++) {
+          const x = offX + 20 + rand() * (mapa.chunkLargura - 40);
+          const z = offY + 20 + rand() * (mapa.chunkAltura - 40);
+          const livre = zonas.every(zz => !rectCruza(x - 30, z - 30, 60, 60, offX + zz.x, offY + zz.y, zz.w, zz.h, 8))
+            && ruas.every(rr => !rectCruza(x - 30, z - 30, 60, 60, offX + rr.x, offY + rr.y, rr.w, rr.h, 8));
+          if (!livre) continue;
+          const monte = new THREE.Mesh(
+            new THREE.SphereGeometry((NAT.monte || {}).raio || 26, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+            new THREE.MeshLambertMaterial({ color: 0x2f5d3a })
+          );
+          monte.scale.y = ((NAT.monte || {}).altura || 14) / ((NAT.monte || {}).raio || 26);
+          monte.position.set(x, 0, z);
+          monte.castShadow = true;
+          terrainGroup.add(monte);
+        }
         // rochas
-        for (let ri = 0; ri < 6; ri++) {
+        for (let ri = 0; ri < (NAT.rochasPorChunk || 8); ri++) {
           const x = offX + 8 + rand() * (mapa.chunkLargura - 16);
           const z = offY + 8 + rand() * (mapa.chunkAltura - 16);
           const livre = zonas.every(zz => !rectContem(x, z, offX + zz.x, offY + zz.y, zz.w, zz.h, 3))
@@ -760,7 +890,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         }
         // flores dentro das zonas (campo de cor)
         if (zonas.length) {
-          for (let fi = 0; fi < 14; fi++) {
+          for (let fi = 0; fi < (NAT.floresPorZona || 26); fi++) {
             const z = zonas[Math.floor(rand() * zonas.length)];
             const x = offX + z.x + 6 + rand() * (z.w - 12);
             const zz = offY + z.y + 6 + rand() * (z.h - 12);
@@ -773,7 +903,57 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
             terrainGroup.add(flor);
           }
         }
+        // flores selvagens nos prados livres (prados floridos entre a floresta e as ruas)
+        for (let fi = 0; fi < 21; fi++) {
+          const x = offX + 8 + rand() * (mapa.chunkLargura - 16);
+          const z = offY + 8 + rand() * (mapa.chunkAltura - 16);
+          const livre = zonas.every(zz => !rectContem(x, z, offX + zz.x, offY + zz.y, zz.w, zz.h, 2))
+            && ruas.every(rr => !rectContem(x, z, offX + rr.x, offY + rr.y, rr.w, rr.h, 2));
+          if (!livre) continue;
+          const cor = [0xf9a8d4, 0xfde68a, 0xffffff, 0x86efac, 0xfb7185][Math.floor(rand() * 5)];
+          const haste = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.12, 2.2, 4),
+            new THREE.MeshLambertMaterial({ color: 0x3f7d3a })
+          );
+          haste.position.set(x, 1.1, z);
+          terrainGroup.add(haste);
+          const flor = new THREE.Mesh(
+            new THREE.SphereGeometry(0.75, 6, 6),
+            new THREE.MeshLambertMaterial({ color: cor, emissive: cor.clone().multiplyScalar(0.25) })
+          );
+          flor.position.set(x, 2.3, z);
+          terrainGroup.add(flor);
+        }
       });
+      /* ---------- montanhas de fundo: horizonte com neve (v9.3) ---------- */
+      /* ---------- aves de ambiente: águias/corujas/papagaios a voar (v9.3) ---------- */
+      birds.forEach(b => { envGroup.remove(b); disposeDeep(b); });
+      birds.length = 0;
+      for (let bi = 0; bi < 8; bi++) {
+        const ave = makeBird(rand2, bi);
+        envGroup.add(ave);
+        birds.push(ave);
+      }
+      const NM = NAT.montanhas || 3;
+      for (let mi = 0; mi < NM; mi++) {
+        const mont = NAT.montanha || { raio: 34, altura: 88 };
+        const mx = w * (0.15 + (mi / Math.max(1, NM - 1)) * 0.7);
+        const mz = mi % 2 === 0 ? -70 : h + 70;
+        const escala = 0.85 + ((mi * 7919) % 30) / 100;
+        const montanha = new THREE.Mesh(
+          new THREE.ConeGeometry(mont.raio * escala, mont.altura * escala, 6),
+          new THREE.MeshLambertMaterial({ color: new THREE.Color(mont.cor || '#5b6472') })
+        );
+        montanha.position.set(mx, (mont.altura * escala) / 2, mz);
+        montanha.castShadow = true;
+        terrainGroup.add(montanha);
+        const neve = new THREE.Mesh(
+          new THREE.ConeGeometry(mont.raio * escala * 0.34, mont.altura * escala * 0.34, 6),
+          new THREE.MeshLambertMaterial({ color: new THREE.Color(mont.neve || '#f8fafc') })
+        );
+        neve.position.set(mx, mont.altura * escala * 0.835, mz);
+        terrainGroup.add(neve);
+      }
       /* ---------- construções com arquitetura por setor ---------- */
       const addEmoji = (emojiChar, x, y, z, tam = 18) => {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTexture(emojiChar), depthTest: false, transparent: true }));
@@ -1095,6 +1275,41 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         }
         addEmoji(def.emoji, bx, 28, bz, 15);
       }
+      // fazenda: rancho rural — casa com telhado vermelho, silo, cercas e fardos de feno (v9.3)
+      function buildFazenda(bx, bz, def) {
+        const parede = new THREE.MeshLambertMaterial({ color: '#fde8d7' });
+        const madeira = new THREE.MeshLambertMaterial({ color: '#7c5230' });
+        const telhadoVerm = new THREE.MeshLambertMaterial({ color: '#b91c1c' });
+        // casa grande
+        const casa = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 14), parede);
+        casa.position.set(bx - 8, 5, bz); casa.castShadow = true; terrainGroup.add(casa);
+        const telhFz = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 8.6, 24, 3), telhadoVerm);
+        telhFz.rotation.z = Math.PI / 2; telhFz.scale.set(1, 1, 0.75);
+        telhFz.position.set(bx - 8, 12.4, bz); telhFz.castShadow = true; terrainGroup.add(telhFz);
+        const portaFz = new THREE.Mesh(new THREE.BoxGeometry(4, 6, 0.8), madeira);
+        portaFz.position.set(bx - 8, 3, bz + 7.2); terrainGroup.add(portaFz);
+        // silo de grãos
+        const silo = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 16, 12), new THREE.MeshLambertMaterial({ color: '#cbd5e1' }));
+        silo.position.set(bx + 10, 8, bz - 6); silo.castShadow = true; terrainGroup.add(silo);
+        const cúpula = new THREE.Mesh(new THREE.SphereGeometry(4.4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), telhadoVerm);
+        cúpula.position.set(bx + 10, 16, bz - 6); terrainGroup.add(cúpula);
+        // cercas de madeira à volta do terreiro
+        for (let l = 0; l < 2; l++) {
+          const cerca = new THREE.Mesh(new THREE.BoxGeometry(l ? 30 : 34, 0.4, 0.4), madeira);
+          cerca.position.set(bx + (l ? 2 : 0), 1.6, bz + (l ? 12 : -12)); terrainGroup.add(cerca);
+        }
+        for (let p = 0; p < 6; p++) {
+          const posteFz = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 6), madeira);
+          posteFz.position.set(bx - 16 + p * 6.4, 1.1, bz + (p % 2 ? 12 : -12)); terrainGroup.add(posteFz);
+        }
+        // fardos de feno
+        for (const [hx, hz] of [[4, 6], [8, 8], [12, 4]]) {
+          const fardo = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 3, 10), new THREE.MeshLambertMaterial({ color: '#d4a437' }));
+          fardo.rotation.z = Math.PI / 2; fardo.position.set(bx + hx, 1.6, bz + hz); fardo.castShadow = true;
+          terrainGroup.add(fardo);
+        }
+        addEmoji(def.emoji, bx, 26, bz, 16);
+      }
       // restantes: casa com telhado (estilo geral)
       mundo.construcoes.forEach((c, i) => {
         const def = C.construcoes[c.tipo] || { cor: '#94a3b8', emoji: '🏛️', nome: c.tipo };
@@ -1110,6 +1325,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         if (c.tipo === 'fabrica') { buildFabrica(bx, bz, def); return; }
         if (c.tipo === 'tribunal') { buildTribunal(bx, bz, def); return; }
         if (c.tipo === 'praca_missoes') { buildPracaMissoes(bx, bz, def); return; }
+        if (c.tipo === 'fazenda') { buildFazenda(bx, bz, def); return; }
         const altura = 16 + (i % 3) * 6;
         const corBase = new THREE.Color(def.cor);
         const box = new THREE.Mesh(
@@ -1374,6 +1590,16 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         c.g.position.x += c.speed * dt;
         if (c.g.position.x > Dd.w + 240) c.g.position.x = -240;
       });
+      // aves de ambiente: círculos amplos no céu, asas a bater (v9.3)
+      birds.forEach(b => {
+        const U = b.userData;
+        U.ang += U.speed * dt;
+        b.position.set(Dd.w / 2 + Math.cos(U.ang) * U.r, U.h + Math.sin(U.ang * 2.3) * 6, Dd.h / 2 + Math.sin(U.ang) * U.r * 0.72);
+        b.rotation.y = -U.ang + Math.PI / 2;
+        const bat = Math.sin(t * 8 + U.ang * 3);
+        U.wingL.rotation.z = 0.25 + bat * 0.55;
+        U.wingR.rotation.z = -0.25 - bat * 0.55;
+      });
       // água animada
       waters.forEach(ag => {
         const pos = ag.geometry.attributes.position;
@@ -1456,6 +1682,19 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         A.head.rotation.y = andando ? 0 : Math.sin(t * 0.8 + h * 0.3) * 0.5;
         A.pack.rotation.x = andando ? Math.sin(t * 5 + h) * 0.08 : Math.sin(t * 1.2 + h) * 0.03;
         g.position.y = andando ? Math.abs(Math.sin(t * 6 + h)) * 0.7 : 0;
+        // v9.3: o cocheiro puxa uma carroça de tração animal atrás de si
+        if (np.tipo === 'cocheiro') {
+          let carroca = g.userData.carroca;
+          if (!carroca) {
+            carroca = makeCarroca();
+            g.add(carroca);
+            g.userData.carroca = carroca;
+          }
+          carroca.position.set(0, 0.6, -7.5);
+          carroca.rotation.z = andando ? Math.sin(t * 6 + h) * 0.05 : 0;
+          const rodaF = carroca.userData.rodas || [];
+          rodaF.forEach(r => { r.rotation.x = t * 4; });
+        }
       });
       for (const [id, g] of npcMap) {
         if (!npcVivos.has(id)) { disposeDeep(g); npcGroup.remove(g); npcMap.delete(id); }
@@ -1488,6 +1727,21 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
         g.position.y = hop + (forma === 'borboleta' ? 6 : 0); // borboleta voa
         A.tail.rotation.x = Math.sin(t * 9 + h * 0.05) * (forma === 'tartaruga' ? 0.12 : 0.5); // rabinho
         A.head.rotation.z = Math.sin(t * 1.6 + h * 0.09) * 0.12; // curiosidade
+        if (ud.habitat === 'ar') {
+          // voo: mergulhos suaves + asas a bater (v9.3)
+          const bat = Math.sin(t * (ud.forma === 'coruja' ? 5.5 : 7.5) + h * 0.07);
+          g.position.y = 42 + Math.sin(t * 0.5 + h * 0.05) * 10;
+          if (A.wingL) A.wingL.rotation.z = 0.35 + bat * 0.75;
+          if (A.wingR) A.wingR.rotation.z = -0.35 - bat * 0.75;
+          if (A.tail) A.tail.rotation.x = Math.sin(t * 1.2 + h) * 0.28; // leme
+        } else if (ud.habitat === 'agua') {
+          // peixe: salta em arco quando o engine sinaliza (v9.3)
+          const salto = an.saltando || 0;
+          g.position.y = salto > 0 ? Math.sin((3 - salto) / 3 * Math.PI) * 7 : 0.4;
+          if (A.dorsal) A.dorsal.rotation.x = Math.sin(t * 6 + h) * 0.3;
+        } else if (ud.forma === 'vaca' || ud.forma === 'ovelha' || ud.forma === 'cavalo' || ud.forma === 'galo') {
+          A.head.rotation.x = moving ? Math.sin(t * 8 + h * 0.11) * 0.1 : 0.35; // pastar
+        }
         A.body.scale.y = 0.82 + Math.sin(t * 3 + h * 0.07) * 0.03; // respiração
         if (forma === 'borboleta') {
           // asas a bater + brilho ao anoitecer (vaga-lume sintético)
