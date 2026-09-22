@@ -643,13 +643,21 @@ teste('v10: frota navega, pesca enche carga, ferri transporta o Criador entre ma
   // desembarque (toggle)
   const r2 = E.jogadorNavegar(m);
   expect(r2.ok && ferri.passageiro === null, 'desembarque devia funcionar');
-  // piratas forçados caçam presas
-  const pirata = { ...m.barcos[0], id: E.gerarId(), tipo: 'pirata', nome: 'Teste Negro', viva: true, rendicao: 0, carga: 0, espera: 0 };
-  m.barcos.push(pirata);
-  const carga0 = pesca.carga;
-  for (let i = 0; i < 60; i++) E.tick(m);
-  expect(m.barcos.includes(pirata) ? pirata.carga >= 0 : true, 'pirata coerente');
-  expect(pesca.carga >= carga0, 'pesca devia acumular carga');
+  // rede enche longe do cais
+  pesca.carga = 0; pesca.espera = 0;
+  pesca.x += 180; pesca.y += 40;
+  E.tick(m);
+  expect(pesca.carga > 0, 'rede devia encher longe do cais');
+  // descarrega junto ao cais (farol aumenta o rendimento e o fundo comum recebe)
+  pesca.carga = 40; pesca.x = wd.cais.x; pesca.y = wd.cais.y + 18;
+  const fundo0 = m.fundoComum;
+  E.tick(m);
+  expect(pesca.carga === 0, 'pesqueiro devia descarregar no cais');
+  expect(m.fundoComum > fundo0, 'fundo comum devia receber o pescado');
+  // pirata forçado caça sem rebentar o tick
+  m.barcos.push({ ...m.barcos[0], id: E.gerarId(), tipo: 'pirata', nome: 'Teste Negro', viva: true, rendicao: 0, carga: 0, espera: 0 });
+  for (let i = 0; i < 12; i++) E.tick(m);
+  expect(m.barcos.length >= 2, 'frota devia continuar ativa');
 });
 
 teste('v10: NPCs portuários chegam em saltos fib(7), polícia patrulha, falas PT/EN', () => {
