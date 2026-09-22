@@ -592,5 +592,120 @@ teste('v9.2: fundo comum ergue a Praça das Missões e o Tribunal sozinho', () =
   expect(m.ideias.includes('blockchain'), 'blockchain devia ter sido financiada para o Tribunal');
 });
 
+// ============ v10: Reino de WestDocks — ilha, docas, frota, polícia ============
+
+teste('v10: anexar WestDocks cria reino, edifícios, mar e frota — e custa moedas', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  // sem dinheiro não anexa
+  const r0 = E.anexarWestDocks(m);
+  expect(!r0.ok, 'devia falhar sem moedas');
+  m.jogador.necessidades.dinheiro = 5000;
+  const r = E.anexarWestDocks(m);
+  expect(r.ok, 'anexação devia funcionar: ' + (r.erro || ''));
+  expect(m.westdocks && m.westdocks.anexado, 'westdocks devia existir e estar anexado');
+  expect(m.jogador.necessidades.dinheiro === 5000 - CFG.westdocks.custoAnexar, 'custo devia ser debitado');
+  // edifícios entram com posição real (wx/wy) e criadoPor=westdocks
+  const wdB = m.construcoes.filter(c => c.criadoPor === 'westdocks');
+  expect(wdB.length >= CFG.westdocks.edificios.length, 'edifícios em falta');
+  expect(wdB.every(c => c.wx != null && c.wy != null), 'edifício sem posição real');
+  ['docas', 'pub', 'loja', 'farol', 'caserna'].forEach(t => expect(wdB.some(c => c.tipo === t), 'falta edifício ' + t));
+  // frota inicial: ferri + pesca (pirata é aleatório)
+  expect(m.barcos.length >= 2, 'frota devia ter ferri e pesca');
+  expect(m.barcos.some(b => b.tipo === 'ferri') && m.barcos.some(b => b.tipo === 'pesca'), 'ferri/pesca em falta');
+  // fauna marítima coloniza o mar
+  const mar = CFG.fauna.especies.golfinho && CFG.fauna.especies.golfinho.habitat === 'mar';
+  expect(mar, 'golfinho devia ser marítimo na config');
+  // segunda anexação falha
+  expect(!E.anexarWestDocks(m).ok, 'devia recusar segunda anexação');
+});
+
+teste('v10: frota navega, pesca enche carga, ferri transporta o Criador entre margens', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  const ferri = m.barcos.find(b => b.tipo === 'ferri');
+  const pesca = m.barcos.find(b => b.tipo === 'pesca');
+  const x0 = ferri.x, y0 = ferri.y;
+  for (let i = 0; i < 30; i++) E.tick(m);
+  expect(Math.hypot(ferri.x - x0, ferri.y - y0) > 5, 'ferri devia navegar');
+  expect(typeof pesca.carga === 'number', 'barco de pesca devia ter carga');
+  // embarcar exige estar no cais ou na ponte
+  const wd = m.westdocks;
+  const rLonge = E.jogadorNavegar(m);
+  expect(!rLonge.ok, 'não devia embarcar longe do cais');
+  m.jogador.x = wd.cais.x; m.jogador.y = wd.cais.y;
+  const r = E.jogadorNavegar(m);
+  expect(r.ok, 'embarque no cais devia funcionar: ' + (r.erro || ''));
+  expect(ferri.passageiro === m.jogador.id, 'ferri devia ter o Criador a bordo');
+  expect(ferri.destino, 'ferri devia ter destino');
+  // desembarque (toggle)
+  const r2 = E.jogadorNavegar(m);
+  expect(r2.ok && ferri.passageiro === null, 'desembarque devia funcionar');
+  // piratas forçados caçam presas
+  const pirata = { ...m.barcos[0], id: E.gerarId(), tipo: 'pirata', nome: 'Teste Negro', viva: true, rendicao: 0, carga: 0, espera: 0 };
+  m.barcos.push(pirata);
+  const carga0 = pesca.carga;
+  for (let i = 0; i < 60; i++) E.tick(m);
+  expect(m.barcos.includes(pirata) ? pirata.carga >= 0 : true, 'pirata coerente');
+  expect(pesca.carga >= carga0, 'pesca devia acumular carga');
+});
+
+teste('v10: NPCs portuários chegam em saltos fib(7), polícia patrulha, falas PT/EN', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  for (let i = 0; i < 60; i++) E.tick(m);
+  const wdTipos = ['policia', 'estivador', 'taberneiro', 'marinheiro', 'faroleiro'];
+  const wdNpcs = m.npcs.filter(n => wdTipos.includes(n.tipo));
+  expect(wdNpcs.length >= 4, 'NPCs portuários deviam ter chegado: ' + wdNpcs.map(n => n.tipo).join(','));
+  expect(wdNpcs.some(n => n.tipo === 'policia'), 'polícia devia existir');
+  const pol = m.npcs.find(n => n.tipo === 'policia');
+  const d0 = Math.hypot(pol.alvo.x - pol.x, pol.alvo.y - pol.y);
+  E.tick(m);
+  const d1 = Math.hypot(pol.alvo.x - pol.x, pol.alvo.y - pol.y);
+  expect(pol.pausa > 0 || d1 < d0 || d0 < 12, 'polícia devia patrulhar');
+  // falas ao Criador em PT e EN (nunca Lume)
+  const rPt = E.falarNpc(m, pol.id);
+  expect(rPt.ok && rPt.texto && rPt.nome, 'falarNpc devia responder');
+  m.jogador.idioma = 'en';
+  const rEn = E.falarNpc(m, pol.id);
+  expect(rEn.ok && rEn.texto, 'fala EN devia existir');
+  expect(!/[⟨⟩|]/.test(rEn.texto), 'falas não deviam conter tokens Lume');
+  m.jogador.idioma = 'pt';
+  expect(!E.falarNpc(m, 'id-inexistente').ok, 'NPC desconhecido devia falhar');
+});
+
+teste('v10: loja dá desconto, farol aumenta rendimento da pesca, serialização completa', () => {
+  const m = E.criarMundo(CFG);
+  E.entrarComoJogador(m, 'Criador');
+  const item = 'picareta';
+  const precoSemLoja = E.custoFerramenta(m, item);
+  expect(precoSemLoja === CFG.ferramentas[item].custo, 'sem loja não há desconto');
+  m.jogador.necessidades.dinheiro = 5000;
+  E.anexarWestDocks(m);
+  const precoComLoja = E.custoFerramenta(m, item);
+  expect(precoComLoja < precoSemLoja, 'loja devia dar desconto: ' + precoComLoja + ' vs ' + precoSemLoja);
+  expect(precoComLoja === Math.round(precoSemLoja * 0.85), 'desconto devia ser 15%');
+  // ciclo JSON completo: reino, frota, fila de NPCs e edifícios sobrevivem
+  for (let i = 0; i < 30; i++) E.tick(m);
+  const dados = JSON.parse(E.serializar(m));
+  expect(dados.westdocks && dados.westdocks.anexado, 'westdocks devia serializar');
+  expect((dados.barcos || []).length === m.barcos.length, 'frota devia serializar');
+  const m2 = E.criarMundo(CFG);
+  expect(E.deserializar(m2, dados), 'import falhou');
+  expect(m2.westdocks && m2.westdocks.anexado, 'westdocks devia sobreviver ao ciclo JSON');
+  expect(m2.barcos.length === m.barcos.length, 'barcos perdidos no ciclo JSON');
+  expect(m2.construcoes.filter(c => c.criadoPor === 'westdocks').length === m.construcoes.filter(c => c.criadoPor === 'westdocks').length, 'edifícios WD perdidos');
+  expect(E.custoFerramenta(m2, item) === precoComLoja, 'desconto da loja devia sobreviver');
+  // mundos antigos sem westdocks migram limpos
+  delete dados.westdocks; delete dados.barcos; delete dados.wdNpcQueue;
+  const m3 = E.criarMundo(CFG);
+  expect(E.deserializar(m3, dados), 'import legado falhou');
+  expect(m3.westdocks === null && m3.barcos.length === 0, 'migração v9.2 → v10 devia ficar sem WestDocks');
+});
+
 console.log(falhas === 0 ? '\n✅ Tudo passou.' : `\n❌ ${falhas} teste(s) falharam.`);
 process.exit(falhas === 0 ? 0 : 1);

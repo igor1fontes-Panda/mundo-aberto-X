@@ -167,6 +167,10 @@
       fauna: null,
       fundoComum: 0,
       lagos: null,           // v9.3: lagos registados pelo render 3D (peixes nadam neles)
+      // v10: Reino de WestDocks (cidade-irmã à beira-mar) + frota do Mar de West
+      westdocks: null,       // preenchido por anexarWestDocks
+      barcos: [],            // ferri de passagem, pesca e piratas
+      wdNpcQueue: null,      // NPCs portuários que chegam em saltos fib(7)
       // v9: RPG anime mundo aberto — missões, diplomacia, justiça, história, Kardashev
       missoes: [],           // board de missões (quest board)
       diplomacia: null,      // { pactos, guerra, tensao, reputacaoCriador, processoPaz }
@@ -790,6 +794,18 @@
     const d = dimensoesMundo(mundo);
     const temFazenda = mundo.construcoes.some(c => c.tipo === 'fazenda');
     mundo.fauna.forEach(an => {
+      // v10: fauna do Mar de West nada na faixa oceânica e salta nas ondas
+      if (an.habitat === 'mar') {
+        const mar = marDeWest(mundo);
+        if (mar) {
+          const cx = (mar.x0 + mar.x1) / 2, cz = (mar.y0 + mar.y1) / 2;
+          if (an.x < mar.x0 + 10 || an.x > mar.x1 - 10 || an.y < mar.y0 + 6 || an.y > mar.y1 - 6) {
+            an.rumo = Math.atan2(cz - an.y, cx - an.x);
+          }
+          if (an.saltando > 0) an.saltando--;
+          else if (Math.random() < 1 / 8) an.saltando = 3;
+        }
+      }
       // Peixes nadam dentro do lago mais próximo (v9.3): fora de água, voltam a pressa
       if (an.habitat === 'agua' && mundo.lagos && mundo.lagos.length) {
         const lago = mundo.lagos.reduce((m2, l) => (Math.hypot(l.cx - an.x, l.cz - an.y) < Math.hypot(m2.cx - an.x, m2.cz - an.y) ? l : m2));
@@ -939,6 +955,244 @@
     mundo.itensNoChao.push({ id: gerarId(), itemKey: Math.random() < 0.4 ? 'semente' : 'picareta', x: clamp(spawnX + 30, 5, offX + largura - 5), y: clamp(spawnY + 30, 5, offY + altura - 5) });
     logMundo(mundo, `🗺️ ${ag.nome} expandiu o mundo: ${modelo.nome} (+${custo} moedas). Novas ruas: ${modelo.ruas.map(r => r.nome).join(', ')}.`);
     return { ok: true, chunk: modelo.nome, custo };
+  }
+
+  // ============================================================
+  // v10: REINO DE WESTDOCKS — cidade-irmã à beira-mar
+  // Ilha ligada por ponte (terra) e ferri (mar). Docas, taberna, loja,
+  // farol, caserna, bairro de casas. NPCs com falas, polícia que patrulha,
+  // barcos: ferri de passagem, pesca e piratas. Régua de Fibonacci:
+  // ferri parte a cada fib(8)=21 ticks; pesca enche a rede em fib(7)=13;
+  // novos barcos entram em saltos fib(6)=8.
+  // ============================================================
+  function cfgWestDocks(mundo) { return mundo.cfg.westdocks || null; }
+
+  function temWestDocks(mundo) { return !!(mundo.westdocks && mundo.westdocks.anexado); }
+
+  // Mar de West: oceano a sul da costa de WestDocks (v10) — barcos e fauna marítima.
+  // Ancorado à ilha (y da config), não ao mundo inteiro, para continuar costeiro
+  // mesmo depois de o Criador comprar chunks para sul.
+  function marDeWest(mundo) {
+    const wd = cfgWestDocks(mundo);
+    if (!wd || !temWestDocks(mundo)) return null;
+    const d = dimensoesMundo(mundo);
+    const y0 = (wd.mar.y0 != null) ? wd.mar.y0 : 330;
+    const altura = (wd.mar.altura != null) ? wd.mar.altura : 150;
+    return { x0: 0, x1: d.w, y0, y1: y0 + altura };
+  }
+
+  function noMar(mundo, x, y) {
+    const mar = marDeWest(mundo);
+    if (!mar) return false;
+    return x >= mar.x0 && x <= mar.x1 && y >= mar.y0 && y <= mar.y1;
+  }
+
+  // Anexa o Reino de WestDocks: ilha + edifícios + frota inicial
+  function anexarWestDocks(mundo) {
+    const wd = cfgWestDocks(mundo);
+    if (!wd) return { ok: false, erro: 'Configuração de WestDocks ausente' };
+    if (temWestDocks(mundo)) return { ok: false, erro: 'WestDocks já faz parte do mundo' };
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    if (j.necessidades.dinheiro < wd.custoAnexar) return { ok: false, erro: `Custa ${wd.custoAnexar} moedas` };
+    j.necessidades.dinheiro -= wd.custoAnexar;
+    mundo.westdocks = { ...wd, anexado: true, fundadoEm: mundo.tickCount, largos: {
+      wd_praca: { ...wd.largo },
+      wd_cais: { x: wd.cais.x - 40, y: wd.cais.y - 30, w: 110, h: 70 },
+      wd_bairro: { x: wd.largo.x + 40, y: wd.largo.y - 40, w: wd.largo.w, h: wd.largo.h },
+    } };
+    // Edifícios do reino (docas/pub/loja/farol/caserna/casas) entram como construções próprias
+    wd.edificios.forEach(e => {
+      mundo.construcoes.push({ id: gerarId(), tipo: e.tipo, nivel: 1, visitantes: 0,
+        construidoEm: Date.now(), criadoPor: 'westdocks', wx: e.x, wy: e.y });
+    });
+    // Frota: ferri de passagem + barco de pesca (+ eventual esquadra pirata)
+    if (!mundo.barcos) mundo.barcos = [];
+    mundo.barcos.push(criarBarco(mundo, 'ferri'));
+    mundo.barcos.push(criarBarco(mundo, 'pesca'));
+    if (Math.random() < (wd.barcos.pirataChance || 0.12)) mundo.barcos.push(criarBarco(mundo, 'pirata'));
+    // Fauna marítima coloniza o Mar de West (nasce dentro da água)
+    const especiesMar = Object.keys(mundo.cfg.fauna.especies).filter(s => mundo.cfg.fauna.especies[s].habitat === 'mar');
+    const mar = marDeWest(mundo);
+    especiesMar.forEach(sp => {
+      const an = criarAnimal(mundo, sp);
+      if (mar) { an.x = mar.x0 + 30 + Math.random() * Math.max(20, mar.x1 - mar.x0 - 60); an.y = mar.y0 + 10 + Math.random() * Math.max(8, mar.y1 - mar.y0 - 20); }
+      mundo.fauna.push(an);
+    });
+    if (mundo.faunaMaxExtra != null) mundo.faunaMaxExtra += especiesMar.length + 2;
+    // Novos NPCs de vida portuária entram em saltos Fibonacci (fib(7)=13)
+    if (!mundo.wdNpcQueue) mundo.wdNpcQueue = ['policia', 'policia', 'estivador', 'taberneiro', 'marinheiro', 'faroleiro'];
+    logMundo(mundo, '⚓ O REINO DE WESTDOCS junta-se ao multiverso! Docas, taberna, loja e farol aguardam — ponte a leste, ferri no cais.');
+    j.contribuicoes = (j.contribuicoes || 0) + 1;
+    return { ok: true, reino: 'WestDocks', custo: wd.custoAnexar };
+  }
+
+  // ----- FROTA: ferri de passagem, pesca e piratas (v10) -----
+  function criarBarco(mundo, tipo) {
+    const mar = marDeWest(mundo);
+    const nomes = {
+      ferri: ['Alvor', 'Maré Viva', 'Andorinha do Mar'],
+      pesca: ['Sardinha Fiel', 'Rede de Ouro', 'Bom Anjo'],
+      pirata: ['Punho Negro', 'Corvo Sangrento', 'Dama das Brumas'],
+    };
+    const y = mar ? mar.y0 + 20 + Math.random() * Math.max(10, (mar.y1 - mar.y0) - 40) : dimensoesMundo(mundo).h - 60;
+    return { id: gerarId(), tipo, nome: pick(nomes[tipo] || ['Barco']),
+      x: mar ? mar.x0 + 40 + Math.random() * Math.max(20, (mar.x1 - mar.x0) - 80) : 700,
+      y, rumo: Math.random() * Math.PI * 2, velocidade: tipo === 'pirata' ? 2.6 : tipo === 'pesca' ? 1.6 : 1.1,
+      carga: 0, viva: true, rendicao: 0, espera: 0, fase: Math.random() * Math.PI * 2, destino: null, passageiro: null };
+  }
+
+  function tickBarcos(mundo) {
+    if (!temWestDocks(mundo)) return;
+    const wd = cfgWestDocks(mundo);
+    const bcfg = wd.barcos || {};
+    if (!mundo.barcos) mundo.barcos = [];
+    const mar = marDeWest(mundo);
+    if (!mar) return;
+    // novos barcos entram em saltos Fibonacci (fib(6)=8)
+    if (mundo.tickCount % fib(6) === 0) {
+      const piratas = mundo.barcos.filter(b => b.tipo === 'pirata' && b.viva).length;
+      const pesqueiros = mundo.barcos.filter(b => b.tipo === 'pesca' && b.viva).length;
+      const maxPiratas = bcfg.piratasMax != null ? bcfg.piratasMax : 2;
+      if (piratas < maxPiratas && Math.random() < (bcfg.pirataChance || 0.12)) {
+        mundo.barcos.push(criarBarco(mundo, 'pirata'));
+        logMundo(mundo, '☠ Uma vela negra surgiu no horizonte do Mar de West…');
+      } else if (pesqueiros < 2) {
+        mundo.barcos.push(criarBarco(mundo, 'pesca'));
+        logMundo(mundo, '🎣 Um novo barco de pesca largou das docas de WestDocks.');
+      }
+    }
+    const temFarol = mundo.construcoes.some(c => c.tipo === 'farol');
+    const temCaserna = mundo.construcoes.some(c => c.tipo === 'caserna');
+    const j = mundo.jogador;
+    const ponteX = wd.ponte ? wd.ponte.x + (wd.ponte.comprimento || 70) : dimensoesMundo(mundo).w * 0.6;
+    const ponteY = wd.ponte ? wd.ponte.y : 120;
+    const caisX = wd.cais.x, caisY = wd.cais.y + 18;
+    mundo.barcos.forEach(b => {
+      if (!b.viva) return;
+      if (b.tipo === 'pirata') {
+        // piratas caçam a embarcação mais próxima; a caserna/polícia faz-nos render
+        const presas = mundo.barcos.filter(o => o.viva && o.tipo !== 'pirata');
+        const presa = presas.length ? presas.reduce((m2, o) => (Math.hypot(o.x - b.x, o.y - b.y) < Math.hypot(m2.x - b.x, m2.y - b.y) ? o : m2), presas[0]) : null;
+        if (presa) {
+          const dx = presa.x - b.x, dy = presa.y - b.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          b.rumo = Math.atan2(dy, dx);
+          if (dist < 26) {
+            const roubo = Math.min(presa.carga || 0, fib(3));
+            if (roubo > 0) {
+              b.carga += roubo; presa.carga -= roubo;
+              logMundo(mundo, `☠ ${b.nome} abordou ${presa.nome} e roubou ${Math.round(roubo)} de carga!`);
+            }
+            presa.espera = fib(4); // presa abrandada pelo abordamento
+            if (temCaserna || (mundo.npcs || []).some(n => n.tipo === 'policia' && Math.hypot(n.x - b.x, n.y - b.y) < 240)) {
+              b.rendicao += fib(3);
+              if (b.rendicao >= fib(5)) {
+                b.viva = false;
+                logMundo(mundo, `👮 A guarda de WestDocks afastou ${b.nome} do mar!`);
+                return;
+              }
+            }
+          }
+        } else if (Math.random() < 0.2) b.rumo += (Math.random() - 0.5) * 1.2;
+      } else if (b.tipo === 'pesca') {
+        // pesqueiro: deriva e enche a rede; volta ao cais quando cheia
+        const caisPerto = Math.hypot(b.x - caisX, b.y - caisY) < 30;
+        if (b.espera > 0) {
+          b.espera--;
+          b.rumo = Math.atan2(caisY - b.y, caisX - b.x);
+        } else if ((b.carga || 0) >= (bcfg.pescaGanho || 45) || caisPerto) {
+          if (caisPerto) {
+            const ganho = Math.round((b.carga || 0) * (temFarol ? 1.3 : 1));
+            if (ganho > 0) {
+              mundo.fundoComum = Math.min(mundo.cfg.conduta.fundoComumMax || 3000, (mundo.fundoComum || 0) + Math.round(ganho / 3));
+              logMundo(mundo, `🎣 ${b.nome} descarregou ${ganho} de pescado nas Docas Reais (+${Math.round(ganho / 3)} ao fundo comum).`);
+            }
+            b.carga = 0; b.espera = fib(5); // descanso de descarga
+          } else {
+            b.rumo = Math.atan2(caisY - b.y, caisX - b.x);
+          }
+        } else {
+          if (Math.random() < 0.3) b.rumo += (Math.random() - 0.5) * 0.8;
+          b.carga = (b.carga || 0) + 1.5; // a rede enche
+          if (!noMar(mundo, b.x, b.y)) b.rumo = Math.atan2((mar.y0 + mar.y1) / 2 - b.y, (mar.x0 + mar.x1) / 2 - b.x);
+        }
+      } else {
+        // ferri: parte das docas a cada fib(8)=21 ticks para a Ponte do Leste e volta
+        b.fase += 1;
+        const ciclo = bcfg.ferriPartidaTicks || 21;
+        const emDocas = Math.hypot(b.x - caisX, b.y - caisY) < 24;
+        if (emDocas && b.espera <= 0 && b.fase % ciclo === 0) { b.destino = 'ponte'; b.espera = fib(3); }
+        if (b.destino === 'ponte') {
+          b.rumo = Math.atan2(ponteY - b.y, ponteX - b.x);
+          if (Math.hypot(b.x - ponteX, b.y - ponteY) < 26) { b.destino = 'docas'; b.espera = fib(4); }
+        } else {
+          b.rumo = Math.atan2(caisY - b.y, caisX - b.x);
+          if (emDocas && b.espera <= 0) b.espera = 1; // parado no cais entre partidas
+        }
+      }
+      // movimento comum (barcos em espera deslizam devagar)
+      const emEspera = b.espera > 0;
+      const v = b.velocidade * (emEspera && b.tipo !== 'ferri' ? 0.3 : emEspera ? 0.15 : 1);
+      b.x = clamp(b.x + Math.cos(b.rumo) * v, mar.x0 - 20, mar.x1 + 20);
+      b.y = clamp(b.y + Math.sin(b.rumo) * v, mar.y0 - 30, mar.y1);
+      if (b.espera > 0) b.espera--;
+      // ferri transporta o Criador (v10)
+      if (b.tipo === 'ferri' && j && b.passageiro === j.id) {
+        j.x = b.x; j.y = b.y; // viaja dentro do barco
+        if (b.destino === 'docas' && Math.hypot(b.x - caisX, b.y - caisY) < 34) {
+          b.passageiro = null; b.espera = fib(3);
+          logMundo(mundo, '⛵ Chegaste às Docas Reais de WestDocks.');
+        } else if (b.destino === 'ponte' && Math.hypot(b.x - ponteX, b.y - ponteY) < 34) {
+          b.passageiro = null; b.espera = fib(3);
+          logMundo(mundo, '⛵ Chegaste à Ponte do Leste — o continente fica a um passo.');
+        }
+      }
+    });
+    mundo.barcos = mundo.barcos.filter(b => b.viva);
+  }
+
+  // Navegação do Criador (v10): ⛵ Navegar embarca/desembarca do ferri
+  function jogadorNavegar(mundo) {
+    const j = mundo.jogador;
+    if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
+    if (!temWestDocks(mundo)) return { ok: false, erro: 'O Reino de WestDocks ainda não faz parte do mundo' };
+    const wd = cfgWestDocks(mundo);
+    const ferri = (mundo.barcos || []).find(b => b.tipo === 'ferri' && b.viva);
+    if (!ferri) return { ok: false, erro: 'O ferri não está disponível' };
+    if (ferri.passageiro === j.id) {
+      ferri.passageiro = null;
+      logMundo(mundo, '⛵ Desembarcaste do ferri.');
+      return { ok: true, msg: 'Desembarcaste do ferri ⛵' };
+    }
+    const ponteX = wd.ponte ? wd.ponte.x + (wd.ponte.comprimento || 70) : 700;
+    const ponteY = wd.ponte ? wd.ponte.y : 120;
+    const emDocas = Math.hypot(j.x - wd.cais.x, j.y - wd.cais.y) < 90;
+    const emPonte = Math.hypot(j.x - ponteX, j.y - ponteY) < 90;
+    if (!emDocas && !emPonte) return { ok: false, erro: 'Vai ao cais das Docas Reais ou à Ponte do Leste para embarcar' };
+    ferri.passageiro = j.id;
+    ferri.destino = emDocas ? 'ponte' : 'docas';
+    logMundo(mundo, '⛵ Embarcaste no ferri ' + ferri.nome + ' — rumo ' + (ferri.destino === 'ponte' ? 'à Ponte do Leste' : 'a WestDocks') + '.');
+    return { ok: true, msg: 'A bordo do ferri ⛵' };
+  }
+
+  // Falar com um NPC de ambiente (v10): têm falas próprias em PT/EN
+  function falarNpc(mundo, npcId) {
+    const np = (mundo.npcs || []).find(n => n.id === npcId);
+    if (!np) return { ok: false, erro: 'NPC não encontrado' };
+    const def = (((mundo.cfg.npcs || {}).tipos) || {})[np.tipo] || {};
+    const falas = def.falas || {};
+    const lang = (mundo.jogador && mundo.jogador.idioma) || 'pt';
+    const lista = falas[lang] || falas.pt || null;
+    const texto = lista ? pick(lista) : (np.tarefa || '...');
+    return { ok: true, nome: np.nome, texto };
+  }
+
+  // Compras do Criador com loja construída (v10): desconto de 15%
+  function custoFerramenta(mundo, itemKey) {
+    const item = mundo.cfg.ferramentas[itemKey];
+    if (!item) return null;
+    return temConstrucao(mundo, 'loja') ? Math.round(item.custo * 0.85) : item.custo;
   }
 
   // ---------- CHAT ----------
@@ -1309,6 +1563,16 @@
     aplicarConduta(mundo);
     tickFauna(mundo);
     tickNpcs(mundo);
+    // v10: Reino de WestDocks — frota do Mar de West e chegada de NPCs portuários
+    tickBarcos(mundo);
+    if (temWestDocks(mundo) && mundo.wdNpcQueue && mundo.wdNpcQueue.length && mundo.tickCount % fib(7) === 0) {
+      const cfgN = mundo.cfg.npcs;
+      const tipo = mundo.wdNpcQueue.shift();
+      if (cfgN && cfgN.tipos[tipo] && mundo.npcs.length < (cfgN.max || 14) + 7) {
+        const novo = criarNpc(mundo, tipo);
+        if (novo) { mundo.npcs.push(novo); logMundo(mundo, `⚓ ${novo.nome} chegou a WestDocks: ${novo.tarefa}.`); }
+      }
+    }
     // v9: RPG anime mundo aberto
     tickMissoes(mundo);
     tickDiplomacia(mundo);
@@ -1519,8 +1783,10 @@
     const j = mundo.jogador; if (!j) return { ok: false, erro: 'Entra primeiro como Criador' };
     const item = mundo.cfg.ferramentas[itemKey];
     if (!item) return { ok: false, erro: 'Item desconhecido' };
-    if (j.necessidades.dinheiro < item.custo) return { ok: false, erro: 'Dinheiro insuficiente' };
-    j.necessidades.dinheiro -= item.custo;
+    // v10: a Loja de Ferramentas do Porto dá 15% de desconto ao Criador
+    const preco = custoFerramenta(mundo, itemKey) || item.custo;
+    if (j.necessidades.dinheiro < preco) return { ok: false, erro: 'Dinheiro insuficiente' };
+    j.necessidades.dinheiro -= preco;
     if (itemKey === 'kit_medico') j.necessidades.saude = clamp(j.necessidades.saude + 50);
     else if (itemKey === 'implante_neural') j.necessidades.energiaMax = clamp(j.necessidades.energiaMax + 20, 100, 200);
     else if (!j.inventario.includes(itemKey)) j.inventario.push(itemKey);
@@ -1570,7 +1836,14 @@
     const n = mundo.chunksComprados || 0;
     const colunas = 1 + (n >= 1 ? 1 : 0);
     const linhas = 1 + Math.floor(n / 2);
-    return { w: largura * colunas, h: altura * linhas };
+    let w = largura * colunas, h = altura * linhas;
+    // v10: WestDocks estende o mundo — ilha a este (até x=960) e o Mar de West a sul (até y=480)
+    const wd = mundo.westdocks;
+    if (wd && wd.anexado) {
+      w = Math.max(w, (wd.mundoLargura != null) ? wd.mundoLargura : 960);
+      h = Math.max(h, ((wd.mar.y0 != null) ? wd.mar.y0 : 330) + ((wd.mar.altura != null) ? wd.mar.altura : 150));
+    }
+    return { w, h };
   }
 
   function jogadorMover(mundo, x, y, correr) {
@@ -1580,13 +1853,26 @@
     const passo = correr ? 42 : 20;
     const dx = x - j.x, dy = y - j.y;
     const dist = Math.hypot(dx, dy);
-    if (dist <= passo) { j.x = clamp(x, 5, d.w - 5); j.y = clamp(y, 5, d.h - 5); }
-    else { j.x = clamp(j.x + (dx / dist) * passo, 5, d.w - 5); j.y = clamp(j.y + (dy / dist) * passo, 5, d.h - 5); }
+    let nx, ny;
+    if (dist <= passo) { nx = x; ny = y; }
+    else { nx = j.x + (dx / dist) * passo; ny = j.y + (dy / dist) * passo; }
+    // v10: a pé não se entra no Mar de West — a travessia é de ferri
+    const mar = marDeWest(mundo);
+    const noAgua = mar && ny > mar.y0 - 8 && nx > mar.x0 - 8;
+    if (noAgua) ny = mar.y0 - 8;
+    j.x = clamp(nx, 5, d.w - 5);
+    j.y = clamp(ny, 5, d.h - 5);
   }
 
   function jogadorExpandirMapa(mundo) {
     const j = mundo.jogador; if (!j) return { ok: false, erro: 'Entra primeiro' };
     return expandirMapa(mundo, j.id);
+  }
+
+  // v10: o Criador anexa o Reino de WestDocks (cidade-irmã)
+  function jogadorAnexarWestDocks(mundo) {
+    const j = mundo.jogador; if (!j) return { ok: false, erro: 'Entra primeiro' };
+    return anexarWestDocks(mundo);
   }
 
   function jogadorInteragirAnimal(mundo, animalId, acao) {
@@ -1641,6 +1927,9 @@
       fauna: mundo.fauna, fundoComum: mundo.fundoComum, faunaMaxExtra: mundo.faunaMaxExtra || 0, itensNoChao: mundo.itensNoChao || [],
       lagos: mundo.lagos || null,
       npcs: mundo.npcs || null,
+      westdocks: mundo.westdocks || null,
+      barcos: mundo.barcos || [],
+      wdNpcQueue: mundo.wdNpcQueue || null,
       missoes: mundo.missoes || [], diplomacia: mundo.diplomacia || null,
       tribunal: mundo.tribunal || null, historia: mundo.historia || null, kardashev: mundo.kardashev || null,
     }, null, 2);
@@ -1670,6 +1959,10 @@
     // v8.1: NPCs de ambiente (migração: mundos antigos não os têm)
     if (dados.npcs && dados.npcs.length) mundo.npcs = dados.npcs;
     else if (!mundo.npcs) mundo.npcs = criarNpcsInicial(mundo);
+    // v10: Reino de WestDocks (migração silenciosa de mundos antigos)
+    mundo.westdocks = dados.westdocks || null;
+    mundo.barcos = dados.barcos || [];
+    mundo.wdNpcQueue = dados.wdNpcQueue || null;
     // v9: RPG (migração silenciosa de mundos antigos)
     mundo.missoes = dados.missoes || [];
     mundo.diplomacia = dados.diplomacia || null;
@@ -1695,6 +1988,7 @@
     tick, rodadaCriticos, gauntlet, construir, pesquisarIdea,
     enviarChat, mudarIdioma, falarAgente,
     jogadorComprar, jogadorOfertar, jogadorDarFerramenta, jogadorConstruir, jogadorPesquisar, jogadorMover,
+    anexarWestDocks, jogadorAnexarWestDocks, jogadorNavegar, falarNpc, custoFerramenta, temWestDocks,
     jogadorInteragirSer, jogadorAtacar, jogadorDefender, jogadorGerarItem, jogadorPegar,
     atacarAgente, defenderAtivado, pegarItemNoMundo, gerarItemNoMundo,
     expandirMapa, jogadorExpandirMapa, curarAnimal, alimentarAnimal, jogadorInteragirAnimal,

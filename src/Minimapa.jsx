@@ -46,8 +46,14 @@ export default function Minimapa({ m, CFG, dim, jogador, onNavegar, width = 190,
       });
     });
 
-    // construções (quadrados dourados)
+    // construções (quadrados dourados) — WestDocks usa a posição real (wx/wy)
     (m.construcoes || []).forEach(c => {
+      if (c.wx != null) {
+        const x = c.wx * ex, y = c.wy * ey;
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(x - 2, y - 2, 4.5, 4.5);
+        return;
+      }
       // posições determinísticas a partir do id (mesma dispersão do 3D)
       let h = 0; for (let i = 0; i < c.id.length; i++) h = (h * 31 + c.id.charCodeAt(i)) >>> 0;
       const x = ((h % (dim.w - 60)) + 30) * ex;
@@ -55,6 +61,35 @@ export default function Minimapa({ m, CFG, dim, jogador, onNavegar, width = 190,
       ctx.fillStyle = '#fbbf24';
       ctx.fillRect(x - 1.5, y - 1.5, 3.5, 3.5);
     });
+
+    // v10: frota do Mar de West (ferri dourado, pesca ciano, piratas vermelhos)
+    (m.barcos || []).forEach(b => {
+      ctx.fillStyle = b.tipo === 'pirata' ? '#f87171' : b.tipo === 'pesca' ? '#7dd3fc' : '#fde68a';
+      const bx = b.x * ex, by = b.y * ey;
+      ctx.beginPath();
+      ctx.moveTo(bx, by - 2.4);
+      ctx.lineTo(bx + 2.4, by + 2);
+      ctx.lineTo(bx - 2.4, by + 2);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // v10: Mar de West sombreado quando o reino está anexado
+    if (m.westdocks && m.westdocks.anexado) {
+      const my = (m.westdocks.mar.y0 || 330) * ey;
+      ctx.fillStyle = 'rgba(20,80,126,0.35)';
+      ctx.fillRect(0, my, W, H - my);
+      // ponte
+      const pb = m.westdocks.ponte;
+      if (pb) {
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pb.x * ex, pb.y * ey);
+        ctx.lineTo((pb.x + (pb.comprimento || 70)) * ex, pb.y * ey);
+        ctx.stroke();
+      }
+    }
 
     // fauna (pontos verdes)
     ctx.fillStyle = '#34d399cc';
