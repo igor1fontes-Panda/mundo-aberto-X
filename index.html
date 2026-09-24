@@ -71,16 +71,34 @@
 <div id="root"></div>
 <div id="boot-erro"></div>
 <script>
-  window.addEventListener('error', function (e) {
-    var el = document.getElementById('boot-erro');
-    if (el && document.getElementById('root').childElementCount === 0) {
+  // Painel de erro de boot: mostra falhas de arranque no ecrã em vez de loading eterno.
+  // Apanha erros síncronos, falhas de carga de scripts (engine.js/bundle) e rejections.
+  (function () {
+    var mostrado = false;
+    function mostrar(titulo, detalhe) {
+      var el = document.getElementById('boot-erro');
+      if (!el || mostrado) return;
+      mostrado = true;
       el.style.display = 'block';
-      el.textContent = '⚠️ Erro ao arrancar: ' + (e.message || 'desconhecido');
+      el.textContent = titulo + '\n' + (detalhe || '(sem detalhes)') +
+        '\n\nSugestões: recarrega com limpeza de cache (ou desinstala/reinstala a PWA).' +
+        '\nSe persistir, exporta o mundo e usa "Novo Mundo".';
     }
-  });
+    window.addEventListener('error', function (e) {
+      var msg = e && e.message ? e.message : (e && e.target && e.target.src ? 'Falha ao carregar: ' + e.target.src : 'desconhecido');
+      var src = e && e.filename ? '\nem ' + e.filename + ':' + (e.lineno || 0) + ':' + (e.colno || 0) : '';
+      var stack = e && e.error && e.error.stack ? '\n' + e.error.stack : '';
+      mostrar('⚠️ Erro ao arrancar: ' + msg + src, stack);
+    }, true); // capture: apanha também erros de <script> (resource errors)
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e && e.reason;
+      mostrar('⚠️ Erro ao arrancar (promise): ' + (r && (r.message || String(r)) || 'desconhecido'),
+        r && r.stack ? '\n' + r.stack : String(r || ''));
+    });
+  })();
 </script>
 <!-- Motor puro (Node + browser): carregado como script global antes do módulo React -->
-<script src="/engine.js"></script>
+<script src="/engine.js" onerror="(function(){var el=document.getElementById('boot-erro');if(el){el.style.display='block';el.textContent='⚠️ engine.js falhou ao carregar — recarrega a página.';}})()"></script>
 <script type="module" src="/src/main.jsx"></script>
 <script>
   // PWA offline (Android): registo do service worker

@@ -14,7 +14,11 @@ import CFG from '../mundo.json';
    ============================================================ */
 
 const E = window.Engine;
-const FIB8 = E.fib(8); // 21 — intervalo do Gauntlet
+if (!E) {
+  // O index.html mostra o painel #boot-erro; aqui dá contexto em consola.
+  console.error('window.Engine indisponível — /engine.js não carregou antes do módulo React.');
+}
+const FIB8 = E ? E.fib(8) : 21; // 21 — intervalo do Gauntlet
 
 // Migração v5 → v6+: mundos antigos ganham os novos campos
 (function migrar() {
@@ -80,11 +84,19 @@ export default function App() {
   const mundoRef = useRef(null);
   if (!mundoRef.current) {
     const m = E.criarMundo(CFG);
-    let carregado = false;
     try {
       const salvo = localStorage.getItem(CFG.meta.storageKey);
-      if (salvo) carregado = E.deserializar(m, JSON.parse(salvo));
-    } catch (e) { console.warn('Falha ao carregar mundo salvo', e); }
+      if (salvo) {
+        const ok = E.deserializar(m, JSON.parse(salvo));
+        if (!ok) { // mundo salvo danificado/incompatível: começa limpo em vez de rebentar
+          try { localStorage.removeItem(CFG.meta.storageKey); } catch (e) {}
+          console.warn('Mundo salvo inválido — um novo multiverso nasceu.');
+        }
+      }
+    } catch (e) {
+      try { localStorage.removeItem(CFG.meta.storageKey); } catch (e2) {}
+      console.warn('Falha ao carregar mundo salvo — um novo multiverso nasceu.', e);
+    }
     mundoRef.current = m;
   }
   const [, setPing] = useState(0);
