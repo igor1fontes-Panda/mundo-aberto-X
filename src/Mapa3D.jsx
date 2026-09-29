@@ -962,7 +962,7 @@ export default function Mapa3D({ m, CFG, dim, jogador, selecionadoId, alvoFauna,
           terrainGroup.add(haste);
           const flor = new THREE.Mesh(
             new THREE.SphereGeometry(0.75, 6, 6),
-            new THREE.MeshLambertMaterial({ color: cor, emissive: cor.clone().multiplyScalar(0.25) })
+            new THREE.MeshLambertMaterial({ color: cor, emissive: new THREE.Color(cor).multiplyScalar(0.25) })
           );
           flor.position.set(x, 2.3, z);
           terrainGroup.add(flor);
