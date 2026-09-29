@@ -69,3 +69,77 @@ Ver [CLAUDE.md](CLAUDE.md) — regras do projeto, convenções e armadilhas.
 ---
 
 *Feito com [Codebuff](https://codebuff.com) ✦ — agentes, escolas de professores auto-aprendentes, critic loops e a régua de Fibonacci.*
+
+## StarNet release and development notes
+
+The public release train supports Windows and macOS. It refuses to stage a release unless the Windows installer passes Authenticode and timestamp verification, both Mac builds pass Developer ID checks and Apple notarization, and every updater artifact has a valid updater signature. Those are pipeline requirements, not proof that a particular downloaded or installed copy was tested on your machine; `INSTALL.md` explains what to verify and when to stop. Linux packages are internal build artifacts only and are not a supported public release target.
+
+**Early release:** Windows is the most-tested desktop target. macOS has less real-world coverage. Broken? Tell us: androo.agi@gmail.com.
+
+### Run from source
+
+Requirements: Node.js 18+ (Node.js 22 matches CI), Git. Rust and the Tauri prerequisites only for the desktop shell.
+
+The sidecar uses Node core modules only, so it runs without installing anything:
+
+```bash
+git clone https://github.com/androoAGI/starnet.git
+cd starnet
+node sidecar/index.js
+```
+
+Open http://localhost:8787, then connect a provider — bring your own OpenRouter API key (BYOK) or use a supported OAuth sign-in. Provider requests leave your machine when you run an agent; station state, transcripts, memory, and ledgers stay in the local StarNet workspace unless you explicitly use a network tool or connector. See `PRIVACY.md` for the full data map.
+
+### Run free with a local model
+
+No key, no account, no bill: install Ollama, pull a model (`ollama pull llama3.1`), and pick OLLAMA as the provider — on the first-run brain screen, or later in **SETTINGS → PROVIDERS**. StarNet talks to Ollama on `127.0.0.1:11434` and only reports it ready once it can list your local models. Honest caveat: local models are smaller than the cloud ones, so expect slower and rougher work on long tasks.
+
+### Desktop development
+
+```bash
+npm ci
+npm run desktop:dev     # dev shell
+npm run desktop:build   # build installers locally
+```
+
+### Coming from OpenClaw or Hermes?
+
+StarNet can import an existing agent: point it at your on-disk OpenClaw or Hermes home and it mints a StarNet agent from the persona, instructions, memory, and model it finds. API keys never transfer — you re-enter those in the KEYS tab.
+
+### Architecture
+
+| Path | Responsibility |
+| --- | --- |
+| `frontend/` | Vanilla JavaScript station world and desktop UI. |
+| `sidecar/` | Local Node agent runtime: providers, tools, persistence, budgets, consent. |
+| `shared/` | Additive cross-boundary event and schema contracts. |
+| `src-tauri/` | Rust/Tauri desktop shell and bundled runtime. |
+| `test/` | Unit, contract, integration, and release gates. |
+| `qa/` | Live QA receipts, journeys, findings ledger, and release-readiness authority. |
+
+The frontend consumes real sidecar events over localhost HTTP/NDJSON and SSE. Secrets belong to the local authority: secrets are held by the sidecar / OS keychain, never in the frontend.
+
+### Testing
+
+```bash
+npm run test:fast          # required merge gate
+npm run test:http          # live sidecar HTTP/E2E suite
+npm test                   # validation + world + fast + HTTP suites
+npm run security:secrets   # full-history secret scan; requires Gitleaks in PATH
+```
+
+The release aggregate is `npm run qa:ready`. It is candidate-bound: any new commit invalidates the prior READY receipt until the affected live gates are rerun.
+
+### Contributing and security
+
+Contributions are welcome — read `CONTRIBUTING.md` and follow the Code of Conduct.
+
+Do not report vulnerabilities in a public issue. Follow `SECURITY.md` for private reporting instructions.
+
+### License
+
+StarNet is open source under the MIT License. Third-party components remain under their original licenses — see `NOTICE.md`.
+
+The MIT License covers the code only. The StarNet name, the logo, the station artwork and sprites, and the rest of the project's brand identity are owned by Andrew Sims and are not licensed with it — no trademark or other brand rights are granted, expressly or by implication.
+
+MIT means you may fork, modify, and redistribute the code, including commercially. What you may not do is ship it as StarNet: forks and derivatives must use their own name, logo, and artwork, and must not present themselves as this project or as endorsed by it.

@@ -110,6 +110,7 @@ export default function App() {
   const [novoSer, setNovoSer] = useState({ nome: '', arquetipo: 'humano', faccao: 'independente' });
   const [chatInput, setChatInput] = useState('');
   const [toast, setToast] = useState(null);
+  const [planoSelecionado, setPlanoSelecionado] = useState(null);
   const [alvoFauna, setAlvoFauna] = useState(null);
   const chatRef = useRef(null);
   const fileRef = useRef(null);
@@ -433,7 +434,8 @@ export default function App() {
       {/* ============ TOP BAR ============ */}
       <header className="sticky top-0 z-30 backdrop-blur border-b border-slate-800" style={{ background: CORES.painel }}>
         <div className="max-w-7xl mx-auto px-3 py-2 flex flex-wrap items-center gap-2">
-          <h1 className="text-sm sm:text-base font-black tracking-tight mr-2">
+          <h1 className="text-sm sm:text-base font-black tracking-tight mr-2 min-w-0">
+
             <span style={{ color: CORES.ouro }}>🌍</span> MUNDO ABERTO <span style={{ color: CORES.acento }}>X</span>
             <span className="ml-2 text-[10px] font-mono text-slate-500">tick {m.tickCount} · fib {FIB8}</span>
           </h1>
@@ -550,13 +552,47 @@ export default function App() {
           {vista === 'dashboard' && (
             <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
               <h2 className="text-sm font-black" style={{ color: CORES.ouro }}>📊 Dashboard do Mundo</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Missões, diplomacia, justiça, história e a ascensão Kardashev — tudo o que a sociedade fez enquanto jogaste.
-                Volta ao 🎮 Jogo para agir no mapa.
-              </p>
-            </div>
+  <p className="text-[11px] text-slate-400 mt-0.5">
+  Missões, diplomacia, justiça, história e a ascensão Kardashev — tudo o que a sociedade fez enquanto jogaste.
+  Volta ao 🎮 Jogo para agir no mapa.
+  </p>
+  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-emerald-300">Ecossistema autónomo</div>
+      <div className="text-sm font-black text-emerald-100">Agentes + sociedade</div>
+      <div className="text-[10px] text-slate-400">O mundo continua sem jogador.</div>
+    </div>
+    <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-cyan-300">Ciclos autónomos</div>
+      <div className="text-sm font-black text-cyan-100">{m.autonomia ? m.autonomia.ciclos : 0}</div>
+      <div className="text-[10px] text-slate-400">Decisões executadas pelo motor.</div>
+    </div>
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-amber-300">Última decisão</div>
+      <div className="text-[10px] leading-snug text-amber-100">{m.autonomia?.ultimaDecisao || 'A observar o nascimento da sociedade.'}</div>
+    </div>
+  </div>
+  <div className="mt-3 rounded-xl border border-violet-500/30 bg-violet-500/10 p-3">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-[9px] uppercase tracking-widest text-violet-300">Motor de receita</div>
+        <div className="text-sm font-black text-violet-50">Transforma mundos autónomos em experiências vendáveis</div>
+        <div className="text-[10px] text-slate-400">Oferta clara, sem pay-to-win: comunidade grátis, ferramentas premium para criadores.</div>
+      </div>
+      <a href="mailto:androo.agi@gmail.com?subject=StarNet%20Creator%20Pass" className="shrink-0 rounded-lg bg-violet-500 px-3 py-2 text-center text-[11px] font-bold text-white hover:bg-violet-400">Quero o Creator Pass</a>
+    </div>
+    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {[['Explorador', 'Grátis', 'Jogar e acompanhar o ecossistema'], ['Creator Pass', '€9/mês', 'Criar agentes, mundos e exportar histórias'], ['Studio', '€29/mês', 'Vários mundos, analytics e comunidade']].map(([nome, preco, detalhe]) => (
+        <button key={nome} onClick={() => { setPlanoSelecionado(nome); mostrarToast(`${nome}: lista de interesse registada`); }} className={`rounded-lg border p-2 text-left transition-colors ${planoSelecionado === nome ? 'border-violet-300 bg-violet-500/20' : 'border-slate-700 bg-slate-950/30 hover:border-violet-400/60'}`}>
+          <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-100">{nome}</span><span className="text-[10px] font-bold text-violet-200">{preco}</span></div>
+          <div className="mt-1 text-[10px] text-slate-400">{detalhe}</div>
+        </button>
+      ))}
+    </div>
+  </div>
+  </div>
           )}
-          <div className="flex gap-1.5" style={{ display: vista === 'jogo' ? undefined : 'none' }}>
+          <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ display: vista === 'jogo' ? undefined : 'none' }}>
             {[['mundo', '🗺️ Mundo'], ['construir', '🏛️ Construir'], ['sociedade', '🏫 Sociedade'], ['regras', '✨ Regras']].map(([t, l]) => (
               <button key={t} onClick={() => setTab(t)}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"

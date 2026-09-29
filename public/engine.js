@@ -178,6 +178,13 @@
       historia: null,        // { arcoAtivo, capitulo, eventos }
       kardashev: null,       // { nivel, energia }
       npcs: null,            // v8.1: preenchido logo abaixo (missões de comboio precisam deles)
+      autonomia: {            // ecossistema vivo: agentes e sociedade continuam sem jogador
+        modo: 'agentes-sociedade',
+        ciclos: 0,
+        ultimaDecisao: 'O mundo nasceu sem ordens externas.',
+        eventos: 0,
+        jogadorOpcional: true,
+      },
     };
     mundo.npcs = criarNpcsInicial(mundo);
     mundo.fauna = criarFaunaInicial(mundo);
@@ -1633,6 +1640,17 @@
       const t = mundo.lume.novoToken('tok' + mundo.tickCount);
       if (t) logMundo(mundo, `✨ Novo símbolo Lume: ${t.sign} (a língua cresceu)`);
     }
+
+    // Autonomia do ecossistema: não depende de cliques nem de um Criador.
+    // Cada ciclo regista a decisão social mais recente para tornar a simulação observável.
+    if (!mundo.autonomia) mundo.autonomia = { modo: 'agentes-sociedade', ciclos: 0, eventos: 0, jogadorOpcional: true };
+    mundo.autonomia.ciclos++;
+    const vivosAutonomos = mundo.agentes.filter(a => a.estado === 'vivo' && !a.isCriador);
+    const gestores = vivosAutonomos.filter(a => a.gestor > 0.7).length;
+    mundo.autonomia.ultimaDecisao = gestores > 0
+      ? `${gestores} gestor(es) coordenaram a expansão e os recursos.`
+      : `${vivosAutonomos.length} agentes mantiveram a economia, cultura e relações.`;
+    mundo.autonomia.eventos = (mundo.autonomia.eventos || 0) + (culturaGerada > 0 ? 1 : 0);
     return mundo;
   }
 
