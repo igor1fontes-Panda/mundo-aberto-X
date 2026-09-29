@@ -550,11 +550,27 @@ export default function App() {
           {vista === 'dashboard' && (
             <div className="rounded-2xl border border-slate-800 p-3" style={{ background: CORES.painel }}>
               <h2 className="text-sm font-black" style={{ color: CORES.ouro }}>📊 Dashboard do Mundo</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Missões, diplomacia, justiça, história e a ascensão Kardashev — tudo o que a sociedade fez enquanto jogaste.
-                Volta ao 🎮 Jogo para agir no mapa.
-              </p>
-            </div>
+  <p className="text-[11px] text-slate-400 mt-0.5">
+  Missões, diplomacia, justiça, história e a ascensão Kardashev — tudo o que a sociedade fez enquanto jogaste.
+  Volta ao 🎮 Jogo para agir no mapa.
+  </p>
+  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-emerald-300">Ecossistema autónomo</div>
+      <div className="text-sm font-black text-emerald-100">Agentes + sociedade</div>
+      <div className="text-[10px] text-slate-400">O mundo continua sem jogador.</div>
+    </div>
+    <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-cyan-300">Ciclos autónomos</div>
+      <div className="text-sm font-black text-cyan-100">{m.autonomia ? m.autonomia.ciclos : 0}</div>
+      <div className="text-[10px] text-slate-400">Decisões executadas pelo motor.</div>
+    </div>
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-amber-300">Última decisão</div>
+      <div className="text-[10px] leading-snug text-amber-100">{m.autonomia?.ultimaDecisao || 'A observar o nascimento da sociedade.'}</div>
+    </div>
+  </div>
+  </div>
           )}
           <div className="flex gap-1.5" style={{ display: vista === 'jogo' ? undefined : 'none' }}>
             {[['mundo', '🗺️ Mundo'], ['construir', '🏛️ Construir'], ['sociedade', '🏫 Sociedade'], ['regras', '✨ Regras']].map(([t, l]) => (
